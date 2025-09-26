@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Pantheon Chat Web</title>
+<style>
+    body { font-family: Arial, sans-serif; background: #111; color: #eee; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
+    #chat { flex: 1; overflow-y: auto; padding: 10px; }
+    #messages { list-style: none; padding: 0; margin: 0; }
+    #messages li { margin-bottom: 5px; }
+    #inputArea { display: flex; padding: 10px; background: #222; }
+    #msgInput { flex: 1; padding: 5px; font-size: 1em; }
+    button { margin-left: 5px; padding: 5px 10px; }
+    .sender { font-weight: bold; }
+    .import-img { max-width: 200px; display: block; margin-top: 5px; border: 1px solid #555; }
+</style>
+</head>
+<body>
+
+<div id="chat">
+    <ul id="messages"></ul>
+</div>
+
+<div id="inputArea">
+    <input type="text" id="msgInput" placeholder="Type a message..." />
+    <input type="file" id="fileInput" style="display:none" accept="image/*"/>
+    <button id="sendBtn">Send</button>
+    <button id="selectFileBtn">Select Image</button>
+</div>
+
+<script>
+const serverUrl = "http://roydev.pythonanywhere.com";
+let chatId = null;
+let nickname = null;
+let lastIndex = 0;
+const colors = ["red","green","yellow","blue","magenta","cyan"];
+const colorsMap = {SYSTEM:"white"};
+
+function getRandomColor() {
+    return colors[Math.floor(Math.random()*colors.length)];
+}
+
+async function createChat() {
+    const resp = await fetch(`${serverUrl}/new_chat`, {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({})
+    });
+    const data = await resp.json();
+    return data.chat_id;
+}
+
+async function joinChat(chatId, nickname) {
+    const resp = await fetch(`${serverUrl}/join`, {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({chat_id: chatId, nickname})
+    });
+    const data = await resp.json();
+    return !data.error;
+}
+
+async function leaveChat(chatId, nickname) {
+    await fetch(`${serverUrl}/leave`, {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({chat_id: chatId, nickname})
+    });
+}
+
+async function sendMessage(chatId, nickname, text) {
+    await fetch(`${serverUrl}/send_message`, {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({chat_id: chatId, nickname, text})
+    });
+}
+
+async function getMessages() {
+    const resp = await fetch(`${serverUrl}/get_messages/${chatId}/${lastIndex}`);
+    const data = await resp.json();
+    const msgList = document.getElementById("messages");
+
+    for (const msg of data.messages) {
+        if (!colorsMap[msg.sender]) colorsMap[msg.sender] = getRandomColor();
+        const li = document.createElement("li");
+        li.innerHTML = `<span class="sender" style="color:${colorsMap[msg.sender]}">&lt;${msg.sender}&gt;</span> ${msg.text}`;
+        if (msg.text.startsWith("import ")) {
+            try {
+                const jsonStr = msg.text.slice(7);
+                const obj = JSON.parse(jsonStr);
+                if (obj.path) {
+                    const img = document.createElement("img");
+                    img.src = `data:image/jpeg;base64,${obj.path}`;
+                    img.className = "import-img";
+                    li.appendChild(img);
+                }
+            } catch(e){}
+        }
+        msgList.appendChild(li);
+        msgList.scrollTop = msgList.scrollHeight;
+    }
+    lastIndex = data.new_index;
+}
+
+async function sendImportMessage(file, scale=0.3) {
+    const reader = new FileReader();
+    reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+        const obj = {path: base64, type:"color", resolution: scale};
+        await sendMessage(chatId, nickname, "import "+JSON.stringify(obj));
+    };
+    reader.readAsDataURL(file);
+}
+
+async function startChat() {
+    nickname = prompt("Enter your nickname:");
+    const joined = await joinChat(chatId, nickname);
+    if (!joined) { alert("Error joining chat."); return; }
+
+    setInterval(getMessages, 1000);
+}
+
+document.getElementById("sendBtn").addEventListener("click", async () => {
+    const input = document.getElementById("msgInput");
+    const text = input.value.trim();
+    if (!text) return;
+    if (text === "exit") { await leaveChat(chatId, nickname); location.reload(); return; }
+    if (text === "select image") { document.getElementById("fileInput").click(); return; }
+    await sendMessage(chatId, nickname, text);
+    input.value = "";
+});
+
+document.getElementById("selectFileBtn").addEventListener("click", () => {
+    document.getElementById("fileInput").click();
+});
+
+document.getElementById("fileInput").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (file) await sendImportMessage(file);
+    e.target.value = "";
+});
+
+async function init() {
+    const choice = prompt("Type 1 to CREATE a new chat, 2 to JOIN an existing chat:");
+    if (choice === "1") {
+        chatId = await createChat();
+        alert("Chat created, ID: " + chatId);
+        startChat();
+    } else if (choice === "2") {
+        chatId = prompt("Enter chat ID:");
+        startChat();
+    } else {
+        alert("Invalid choice.");
+    }
+}
+
+init();
+</script>
+</body>
+</html>
