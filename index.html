@@ -132,119 +132,28 @@
       return res.json();
     }
 
-function Send-ImportMessage {
-    param($chatId, $nickname, $msg)
-
-    $start = $msg.IndexOf("{")
-    $end   = $msg.LastIndexOf("}")
-    if ($start -lt 0 -or $end -le $start) {
-        Write-Host "Format import invalide." -ForegroundColor Yellow
-        return
-    }
-
-    $content = $msg.Substring($start, $end - $start + 1)
-    $content = $content -replace '\\', '\\\\'
-
-    try {
-        $obj = $content | ConvertFrom-Json -ErrorAction Stop
-
-        if ($obj.path) {
-            $bytes = $null
-
-            # Cas URL
-            if ($obj.path -match "^https?://") {
-                try {
-                    $webClient = New-Object System.Net.WebClient
-                    $bytes = $webClient.DownloadData($obj.path)
-                } catch {
-                    Write-Host "Impossible de télécharger l'image depuis l'URL." -ForegroundColor Yellow
-                    return
-                }
-            } 
-            # Cas fichier local
-            elseif (Test-Path $obj.path) {
-                try {
-                    $bytes = [System.IO.File]::ReadAllBytes($obj.path)
-                } catch {
-                    Write-Host "Impossible de lire le fichier local." -ForegroundColor Yellow
-                    return
-                }
-            } else {
-                Write-Host "Fichier introuvable : $($obj.path)" -ForegroundColor Yellow
-                return
-            }
-
-            # Conversion en Base64
-            if ($bytes) {
-                $obj.path = [System.Convert]::ToBase64String($bytes)
-            }
-        }
-
-        $jsonSend = $obj | ConvertTo-Json -Compress
-        Send-Message -chatId $chatId -nickname $nickname -text "import $jsonSend"
-        Write-Host "Image importée avec succès !" -ForegroundColor Green
-
-    } catch {
-        Write-Host "Format import invalide." -ForegroundColor Yellow
-    }
-}
-function Send-ImportMessage {
-    param($chatId, $nickname, $msg)
-
-    $start = $msg.IndexOf("{")
-    $end   = $msg.LastIndexOf("}")
-    if ($start -lt 0 -or $end -le $start) {
-        Write-Host "Format import invalide." -ForegroundColor Yellow
-        return
-    }
-
-    $content = $msg.Substring($start, $end - $start + 1)
-    $content = $content -replace '\\', '\\\\'
-
-    try {
-        $obj = $content | ConvertFrom-Json -ErrorAction Stop
-
-        if ($obj.path) {
-            $bytes = $null
-
-            # Cas URL
-            if ($obj.path -match "^https?://") {
-                try {
-                    $webClient = New-Object System.Net.WebClient
-                    $bytes = $webClient.DownloadData($obj.path)
-                } catch {
-                    Write-Host "Impossible de télécharger l'image depuis l'URL." -ForegroundColor Yellow
-                    return
-                }
-            } 
-            # Cas fichier local
-            elseif (Test-Path $obj.path) {
-                try {
-                    $bytes = [System.IO.File]::ReadAllBytes($obj.path)
-                } catch {
-                    Write-Host "Impossible de lire le fichier local." -ForegroundColor Yellow
-                    return
-                }
-            } else {
-                Write-Host "Fichier introuvable : $($obj.path)" -ForegroundColor Yellow
-                return
-            }
-
-            # Conversion en Base64
-            if ($bytes) {
-                $obj.path = [System.Convert]::ToBase64String($bytes)
-            }
-        }
-
-        $jsonSend = $obj | ConvertTo-Json -Compress
-        Send-Message -chatId $chatId -nickname $nickname -text "import $jsonSend"
-        Write-Host "Image importée avec succès !" -ForegroundColor Green
-
-    } catch {
-        Write-Host "Format import invalide." -ForegroundColor Yellow
-    }
+async function sendImportMessage(file) {
+    if(!chatId || !nickname) return;
+    const buf = await file.arrayBuffer();
+    const b64 = arrayBufferToBase64(buf);
+    const obj = {
+        path: b64, // Base64 pur
+        type: "color",
+        resolution: 0.3
+    };
+    const text = "import " + JSON.stringify(obj);
+    await sendMessage(text);
 }
 
+    async function sendMessage(chatId, nickname, text) {
+    try {
+        await fetch(`${serverUrl}/send_message`, {
+            method: "POST",
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({chat_id: chatId, nickname, text})
+        });
+    } catch(e) { console.error(e); }
+}
 
 
     async function joinChat(id, nick){
@@ -343,13 +252,13 @@ function startPolling(){
     document.getElementById('messageInput').addEventListener('keydown', async (e)=>{ if(e.key==='Enter'){document.getElementById('sendBtn').click();} });
 
     document.getElementById('selectImageBtn').addEventListener('click', ()=>{ document.getElementById('filePicker').click(); });
-    document.getElementById('filePicker').addEventListener('change', async (ev)=>{
-      const f = ev.target.files[0]; if(!f) return;
-      const buf = await f.arrayBuffer();
-      const b64 = arrayBufferToBase64(buf);
-      const prefill = `import {\"path\":\"data:image/${(f.type||'png').split('/').pop()};base64,${b64}\",\"type\":\"color\",\"resolution\":0.3}`;
-      document.getElementById('messageInput').value = prefill;
-    });
+document.getElementById('filePicker').addEventListener('change', async (ev)=>{
+  const f = ev.target.files[0];
+  if(!f) return;
+  await sendImportMessage(f);
+  document.getElementById('messageInput').value = '';
+});
+
 
     appendLine(`     _____                                                                   _____
     ( ___ )                                                                 ( ___ )
