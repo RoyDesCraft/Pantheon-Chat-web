@@ -81,23 +81,7 @@
     let lastIndex = 0;
     let poller = null;
 
-    function appendLine(text, options = {}){
-      const regex = /\x1b\[48;2;(\d+);(\d+);(\d+)m  /g;
-      if(regex.test(text)){
-        const el = document.createElement('div');
-        el.className = 'line';
-        let match;
-        regex.lastIndex = 0;
-        while((match = regex.exec(text)) !== null){
-          const block = document.createElement('span');
-          block.className = 'color-block';
-          block.style.backgroundColor = `rgb(${match[1]},${match[2]},${match[3]})`;
-          el.appendChild(block);
-        }
-        output.appendChild(el);
-        output.scrollTop = output.scrollHeight;
-        return;
-      }
+    function appendLine(text, options = {}) {
       const el = document.createElement('div');
       el.className = 'line';
       if(options.sender){
@@ -132,29 +116,59 @@
       return res.json();
     }
 
-async function sendImportMessage(file) {
-    if(!chatId || !nickname) return;
-    const buf = await file.arrayBuffer();
-    const b64 = arrayBufferToBase64(buf);
-    const obj = {
-        path: b64, // Base64 pur
+    async function sendMessage(text){
+      if(!chatId || !nickname) return;
+      try{
+        await apiPost('/send_message', { chat_id: chatId, nickname, text });
+      }catch(e){
+        appendLine('Erreur send_message: ' + e.message);
+      }
+    }
+
+    function arrayBufferToBase64(buffer){
+      let binary='';
+      const bytes=new Uint8Array(buffer);
+      for(let i=0;i<bytes.byteLength;i++){ binary+=String.fromCharCode(bytes[i]); }
+      return btoa(binary);
+    }
+
+    async function sendImportMessage(file){
+      if(!chatId || !nickname) return;
+      const buf = await file.arrayBuffer();
+      const b64 = arrayBufferToBase64(buf);
+      const obj = {
+        path: b64,
         type: "color",
         resolution: 0.3
-    };
-    const text = "import " + JSON.stringify(obj);
-    await sendMessage(text);
-}
+      };
+      const text = "import " + JSON.stringify(obj);
+      await sendMessage(text);
+      appendLine("Image importée !", {sender:"SYSTEM", color:"green"});
+    }
 
-    async function sendMessage(chatId, nickname, text) {
-    try {
-        await fetch(`${serverUrl}/send_message`, {
-            method: "POST",
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({chat_id: chatId, nickname, text})
-        });
-    } catch(e) { console.error(e); }
-}
+    async function getMessages(){
+      if(!chatId) return;
+      try{
+        const resp = await apiGet(`/get_messages/${chatId}/${lastIndex}`);
+        if(resp && resp.messages){
+          for(const msg of resp.messages){
+            if(!colorsMap[msg.sender]){
+              colorsMap[msg.sender] = colors[Math.floor(Math.random()*colors.length)];
+            }
+            appendLine(msg.text, { sender: msg.sender, color: colorsMap[msg.sender] });
+          }
+          lastIndex = resp.new_index || lastIndex;
+        }
+      }catch(e){
+        appendLine('Erreur get_messages: '+e.message);
+      }
+    }
 
+    function startPolling(){ 
+      if(poller) return; 
+      poller = setInterval(getMessages, 1200); 
+    }
+    function stopPolling(){ if(!poller) return; clearInterval(poller); poller=null; }
 
     async function joinChat(id, nick){
       if(!nick){ alert('Un pseudo est obligatoire'); return; }
@@ -192,53 +206,19 @@ async function sendImportMessage(file) {
       if(!chatId || !nickname) return;
       try{
         await apiPost('/leave', { chat_id: chatId, nickname });
-        appendLine('Vous avez quitté le chat.');
-        chatId = null; nickname = null;
-        chatIdDisplay.textContent = '—';
-        nickDisplay.textContent = '—';
-        setStatus('Pas connecté');
-        stopPolling();
-        chatUI.style.display = 'none';
+        appendLine('Vous avez quitté le chat.', {sender:"SYSTEM"});
+        chatId=null; nickname=null;
+        chatIdDisplay.textContent='—'; nickDisplay.textContent='—';
+        setStatus('Pas connecté'); stopPolling();
+        chatUI.style.display='none';
       }catch(e){ appendLine('Erreur leave: '+e.message); }
     }
-
-async function getMessages(){
-  if(!chatId) return;
-  try{
-    const resp = await apiGet(`/get_messages/${chatId}/${lastIndex}`);
-    if(resp && resp.messages){
-      for(const msg of resp.messages){
-        if(!colorsMap[msg.sender]){
-          const c = colors[Math.floor(Math.random()*colors.length)];
-          colorsMap[msg.sender] = c;
-        }
-        appendLine(msg.text, { sender: msg.sender, color: colorsMap[msg.sender] });
-      }
-      lastIndex = resp.new_index || lastIndex;
-    }
-  }catch(e){
-    appendLine('Erreur get_messages: '+e.message);
-  }
-}
-
-function startPolling(){ 
-  if(poller) return; 
-  poller = setInterval(getMessages, 1200); 
-}
-
-
-
-    function startPolling(){ if(poller) return; poller = setInterval(getMessages, 1200); }
-    function stopPolling(){ if(!poller) return; clearInterval(poller); poller = null; }
-
-    function arrayBufferToBase64(buffer){ let binary=''; const bytes=new Uint8Array(buffer); for(let i=0;i<bytes.byteLength;i++){ binary+=String.fromCharCode(bytes[i]); } return btoa(binary); }
 
     // --- UI wiring
     document.getElementById('createBtn').addEventListener('click', createNewChat);
     document.getElementById('joinBtn').addEventListener('click', async ()=>{
       const id = prompt('Entrer ID du chat'); if(!id) return;
-      const nick = prompt('Entrer votre pseudo');
-      if(!nick) return;
+      const nick = prompt('Entrer votre pseudo'); if(!nick) return;
       await joinChat(id, nick);
     });
     document.getElementById('leaveBtn').addEventListener('click', leaveChat);
@@ -248,28 +228,30 @@ function startPolling(){
       if(v){ await sendMessage(v); }
       document.getElementById('messageInput').value='';
     });
+    document.getElementById('messageInput').addEventListener('keydown', async (e)=>{
+      if(e.key==='Enter'){ document.getElementById('sendBtn').click(); }
+    });
 
-    document.getElementById('messageInput').addEventListener('keydown', async (e)=>{ if(e.key==='Enter'){document.getElementById('sendBtn').click();} });
-
-    document.getElementById('selectImageBtn').addEventListener('click', ()=>{ document.getElementById('filePicker').click(); });
-document.getElementById('filePicker').addEventListener('change', async (ev)=>{
-  const f = ev.target.files[0];
-  if(!f) return;
-  await sendImportMessage(f);
-  document.getElementById('messageInput').value = '';
-});
-
+    document.getElementById('selectImageBtn').addEventListener('click', ()=>{ 
+      document.getElementById('filePicker').click(); 
+    });
+    document.getElementById('filePicker').addEventListener('change', async (ev)=>{
+      const f = ev.target.files[0]; if(!f) return;
+      await sendImportMessage(f);
+      document.getElementById('messageInput').value='';
+    });
 
     appendLine(`     _____                                                                   _____
     ( ___ )                                                                 ( ___ )
      |   |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|   |
      |   |  ____       _      _   _   _____   _   _   _____    ___    _   _  |   |
-     |   | |  _ \     / \    | \ | | |_   _| | | | | | ____|  / _ \  | \ | | |   |
-     |   | | |_) |   / _ \   |  \| |   | |   | |_| | |  _|   | | | | |  \| | |   |
-     |   | |  __/   / ___ \  | |\  |   | |   |  _  | | |___  | |_| | | |\  | |   |
-     |   | |_|     /_/   \_\ |_| \_|   |_|   |_| |_| |_____|  \___/  |_| \_| |   |
+     |   | |  _ \\     / \\    | \\ | | |_   _| | | | | | ____|  / _ \\  | \\ | | |   |
+     |   | | |_) |   / _ \\   |  \\| |   | |   | |_| | |  _|   | | | | |  \\| | |   |
+     |   | |  __/   / ___ \\  | |\\  |   | |   |  _  | | |___  | |_| | | |\\  | |   |
+     |   | |_|     /_/   \\_\\ |_| \\_|   |_|   |_| |_| |_____|  \\___/  |_| \\_| |   |
      |___|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|___|
     (_____)                                                                 (_____)`);
   </script>
 </body>
 </html>
+
