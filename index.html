@@ -132,6 +132,19 @@
       return res.json();
     }
 
+    async function sendMessage(text){
+  if(!chatId || !nickname) return;
+  try{
+    const resp = await apiPost('/send_message', { chat_id: chatId, sender: nickname, text });
+    if(resp && resp.error){
+      appendLine(`<SYSTEM> <Erreur envoi: ${resp.error}>`);
+    }
+  }catch(e){
+    appendLine(`<SYSTEM> <Erreur réseau: ${e.message}>`);
+  }
+}
+
+
     async function joinChat(id, nick){
       if(!nick){ alert('Un pseudo est obligatoire'); return; }
       try{
