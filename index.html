@@ -1,161 +1,251 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>Pantheon Chat Web</title>
-<style>
-    body { font-family: Arial, sans-serif; background: #111; color: #eee; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
-    #chat { flex: 1; overflow-y: auto; padding: 10px; }
-    #messages { list-style: none; padding: 0; margin: 0; }
-    #messages li { margin-bottom: 5px; }
-    #inputArea { display: flex; padding: 10px; background: #222; }
-    #msgInput { flex: 1; padding: 5px; font-size: 1em; }
-    button { margin-left: 5px; padding: 5px 10px; }
-    .sender { font-weight: bold; }
-    .import-img { max-width: 200px; display: block; margin-top: 5px; border: 1px solid #555; }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pantheon Chat - Terminal Web</title>
+  <style>
+    :root{--bg:#0b0f14;--panel:#0f1720;--text:#d6e1e8;--muted:#9aa7b3;--accent:#7ee0ff}
+    html,body{height:100%;margin:0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;background:linear-gradient(180deg,#00101a 0%,#021827 100%);color:var(--text)}
+    .wrap{max-width:1100px;margin:28px auto;padding:18px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));box-shadow:0 8px 30px rgba(2,6,23,0.7)}
+    header{display:flex;align-items:center;gap:12px}
+    .title{font-size:18px;font-weight:700}
+    .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+    button{background:#162029;border:1px solid rgba(255,255,255,0.03);color:var(--text);padding:8px 10px;border-radius:8px;cursor:pointer}
+    button:active{transform:translateY(1px)}
+    main{margin-top:14px;display:none;grid-template-columns:1fr 320px;gap:14px}
+    .terminal{background:var(--panel);border-radius:8px;padding:12px;min-height:480px;display:flex;flex-direction:column}
+    .output{flex:1;overflow:auto;padding:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);border-radius:6px;font-size:13px}
+    .prompt{display:flex;gap:8px;align-items:center;margin-top:10px}
+    .input{flex:1}
+    input[type="text"], textarea{width:100%;padding:10px;border-radius:6px;background:#061116;border:1px solid rgba(255,255,255,0.03);color:var(--text);outline:none}
+    .sidebar{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px}
+    .meta{font-size:13px;color:var(--muted);margin-bottom:8px}
+    .line{white-space:pre-wrap;font-family:inherit;font-size:13px;margin:4px 0}
+    .sender{font-weight:700;margin-right:6px}
+    .small{font-size:12px;color:var(--muted)}
+    .color-block{display:inline-block;width:10px;height:10px;margin:0 1px;}
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <header>
+      <div class="title">Pantheon Chat — Terminal Web</div>
+      <div class="controls">
+        <button id="createBtn">Créer un chat</button>
+        <button id="joinBtn">Rejoindre</button>
+        <button id="leaveBtn">Quitter</button>
+      </div>
+    </header>
 
-<div id="chat">
-    <ul id="messages"></ul>
-</div>
+    <main id="chatUI">
+      <section class="terminal">
+        <div class="output" id="output" aria-live="polite"></div>
 
-<div id="inputArea">
-    <input type="text" id="msgInput" placeholder="Type a message..." />
-    <input type="file" id="fileInput" style="display:none" accept="image/*"/>
-    <button id="sendBtn">Send</button>
-    <button id="selectFileBtn">Select Image</button>
-</div>
+        <div class="prompt">
+          <div class="input"><input id="messageInput" type="text" placeholder="Tapez un message ou 'select image' / 'return' / 'exit'" /></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="sendBtn">Envoyer</button>
+            <button id="selectImageBtn">Sélectionner image</button>
+          </div>
+        </div>
+      </section>
 
-<script>
-const serverUrl = "http://roydev.pythonanywhere.com";
-let chatId = null;
-let nickname = null;
-let lastIndex = 0;
-const colors = ["red","green","yellow","blue","magenta","cyan"];
-const colorsMap = {SYSTEM:"white"};
+      <aside class="sidebar">
+        <div class="meta">Etat</div>
+        <div id="status">Pas connecté</div>
+        <div style="height:12px"></div>
+        <div class="meta">Chat ID</div>
+        <div id="chatIdDisplay" class="small">—</div>
+        <div style="height:12px"></div>
+        <div class="meta">Pseudo</div>
+        <div id="nickDisplay" class="small">—</div>
+      </aside>
+    </main>
+  </div>
 
-function getRandomColor() {
-    return colors[Math.floor(Math.random()*colors.length)];
-}
+  <input id="filePicker" type="file" accept="image/*" style="display:none" />
 
-async function createChat() {
-    const resp = await fetch(`${serverUrl}/new_chat`, {
-        method: "POST",
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({})
-    });
-    const data = await resp.json();
-    return data.chat_id;
-}
+  <script>
+    const output = document.getElementById('output');
+    const nickDisplay = document.getElementById('nickDisplay');
+    const chatIdDisplay = document.getElementById('chatIdDisplay');
+    const status = document.getElementById('status');
+    const chatUI = document.getElementById('chatUI');
 
-async function joinChat(chatId, nickname) {
-    const resp = await fetch(`${serverUrl}/join`, {
-        method: "POST",
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({chat_id: chatId, nickname})
-    });
-    const data = await resp.json();
-    return !data.error;
-}
+    const colors = ['Red','Green','Yellow','Blue','Magenta','Cyan'];
+    const colorsMap = {"SYSTEM":"White"};
 
-async function leaveChat(chatId, nickname) {
-    await fetch(`${serverUrl}/leave`, {
-        method: "POST",
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({chat_id: chatId, nickname})
-    });
-}
+    let chatId = null;
+    let nickname = null;
+    let lastIndex = 0;
+    let poller = null;
 
-async function sendMessage(chatId, nickname, text) {
-    await fetch(`${serverUrl}/send_message`, {
-        method: "POST",
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({chat_id: chatId, nickname, text})
-    });
-}
-
-async function getMessages() {
-    const resp = await fetch(`${serverUrl}/get_messages/${chatId}/${lastIndex}`);
-    const data = await resp.json();
-    const msgList = document.getElementById("messages");
-
-    for (const msg of data.messages) {
-        if (!colorsMap[msg.sender]) colorsMap[msg.sender] = getRandomColor();
-        const li = document.createElement("li");
-        li.innerHTML = `<span class="sender" style="color:${colorsMap[msg.sender]}">&lt;${msg.sender}&gt;</span> ${msg.text}`;
-        if (msg.text.startsWith("import ")) {
-            try {
-                const jsonStr = msg.text.slice(7);
-                const obj = JSON.parse(jsonStr);
-                if (obj.path) {
-                    const img = document.createElement("img");
-                    img.src = `data:image/jpeg;base64,${obj.path}`;
-                    img.className = "import-img";
-                    li.appendChild(img);
-                }
-            } catch(e){}
+    function appendLine(text, options = {}){
+      const regex = /\x1b\[48;2;(\d+);(\d+);(\d+)m  /g;
+      if(regex.test(text)){
+        const el = document.createElement('div');
+        el.className = 'line';
+        let match;
+        regex.lastIndex = 0;
+        while((match = regex.exec(text)) !== null){
+          const block = document.createElement('span');
+          block.className = 'color-block';
+          block.style.backgroundColor = `rgb(${match[1]},${match[2]},${match[3]})`;
+          el.appendChild(block);
         }
-        msgList.appendChild(li);
-        msgList.scrollTop = msgList.scrollHeight;
+        output.appendChild(el);
+        output.scrollTop = output.scrollHeight;
+        return;
+      }
+      const el = document.createElement('div');
+      el.className = 'line';
+      if(options.sender){
+        const span = document.createElement('span');
+        span.className = 'sender';
+        span.textContent = `<${options.sender}>`;
+        span.style.color = options.color || '#fff';
+        el.appendChild(span);
+        const msg = document.createElement('span');
+        msg.textContent = ' ' + text;
+        el.appendChild(msg);
+      } else {
+        el.textContent = text;
+      }
+      output.appendChild(el);
+      output.scrollTop = output.scrollHeight;
     }
-    lastIndex = data.new_index;
-}
 
-async function sendImportMessage(file, scale=0.3) {
-    const reader = new FileReader();
-    reader.onload = async () => {
-        const base64 = reader.result.split(',')[1];
-        const obj = {path: base64, type:"color", resolution: scale};
-        await sendMessage(chatId, nickname, "import "+JSON.stringify(obj));
-    };
-    reader.readAsDataURL(file);
-}
+    function setStatus(s){ status.textContent = s; }
 
-async function startChat() {
-    nickname = prompt("Enter your nickname:");
-    const joined = await joinChat(chatId, nickname);
-    if (!joined) { alert("Error joining chat."); return; }
-
-    setInterval(getMessages, 1000);
-}
-
-document.getElementById("sendBtn").addEventListener("click", async () => {
-    const input = document.getElementById("msgInput");
-    const text = input.value.trim();
-    if (!text) return;
-    if (text === "exit") { await leaveChat(chatId, nickname); location.reload(); return; }
-    if (text === "select image") { document.getElementById("fileInput").click(); return; }
-    await sendMessage(chatId, nickname, text);
-    input.value = "";
-});
-
-document.getElementById("selectFileBtn").addEventListener("click", () => {
-    document.getElementById("fileInput").click();
-});
-
-document.getElementById("fileInput").addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (file) await sendImportMessage(file);
-    e.target.value = "";
-});
-
-async function init() {
-    const choice = prompt("Type 1 to CREATE a new chat, 2 to JOIN an existing chat:");
-    if (choice === "1") {
-        chatId = await createChat();
-        alert("Chat created, ID: " + chatId);
-        startChat();
-    } else if (choice === "2") {
-        chatId = prompt("Enter chat ID:");
-        startChat();
-    } else {
-        alert("Invalid choice.");
+    async function apiPost(path, body){
+      const res = await fetch('http://roydev.pythonanywhere.com' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+      return res.json();
     }
+
+    async function apiGet(path){
+      const res = await fetch('http://roydev.pythonanywhere.com' + path);
+      return res.json();
+    }
+
+    async function joinChat(id, nick){
+      if(!nick){ alert('Un pseudo est obligatoire'); return; }
+      try{
+        setStatus('Tentative de rejoindre...');
+        const resp = await apiPost('/join', { chat_id: id, nickname: nick });
+        if(resp && !resp.error){
+          chatId = id;
+          nickname = nick;
+          chatIdDisplay.textContent = chatId;
+          nickDisplay.textContent = nickname;
+          appendLine(`Vous avez rejoint le chat: ${chatId}`);
+          setStatus('Connecté');
+          chatUI.style.display = 'grid';
+          startPolling();
+        } else {
+          appendLine('Impossible de rejoindre: ' + (resp.error || JSON.stringify(resp)));
+          setStatus('Erreur');
+        }
+      }catch(e){ appendLine('Erreur join: '+e.message); setStatus('Erreur'); }
+    }
+
+    async function createNewChat(){
+      const nick = prompt('Entrez votre pseudo');
+      if(!nick) return;
+      const resp = await apiPost('/new_chat', {});
+      const id = resp.chat_id || resp.id;
+      if(id){
+        appendLine('Chat créé et rejoint, ID: ' + id);
+        await joinChat(id, nick);
+      } else appendLine('Erreur création');
+    }
+
+    async function leaveChat(){
+      if(!chatId || !nickname) return;
+      try{
+        await apiPost('/leave', { chat_id: chatId, nickname });
+        appendLine('Vous avez quitté le chat.');
+        chatId = null; nickname = null;
+        chatIdDisplay.textContent = '—';
+        nickDisplay.textContent = '—';
+        setStatus('Pas connecté');
+        stopPolling();
+        chatUI.style.display = 'none';
+      }catch(e){ appendLine('Erreur leave: '+e.message); }
+    }
+
+async function getMessages(){
+  if(!chatId) return;
+  try{
+    const resp = await apiGet(`/get_messages/${chatId}/${lastIndex}`);
+    if(resp && resp.messages){
+      for(const msg of resp.messages){
+        if(!colorsMap[msg.sender]){
+          const c = colors[Math.floor(Math.random()*colors.length)];
+          colorsMap[msg.sender] = c;
+        }
+        appendLine(msg.text, { sender: msg.sender, color: colorsMap[msg.sender] });
+      }
+      lastIndex = resp.new_index || lastIndex;
+    }
+  }catch(e){
+    appendLine('Erreur get_messages: '+e.message);
+  }
 }
 
-init();
-</script>
+function startPolling(){ 
+  if(poller) return; 
+  poller = setInterval(getMessages, 1200); 
+}
+
+
+
+    function startPolling(){ if(poller) return; poller = setInterval(getMessages, 1200); }
+    function stopPolling(){ if(!poller) return; clearInterval(poller); poller = null; }
+
+    function arrayBufferToBase64(buffer){ let binary=''; const bytes=new Uint8Array(buffer); for(let i=0;i<bytes.byteLength;i++){ binary+=String.fromCharCode(bytes[i]); } return btoa(binary); }
+
+    // --- UI wiring
+    document.getElementById('createBtn').addEventListener('click', createNewChat);
+    document.getElementById('joinBtn').addEventListener('click', async ()=>{
+      const id = prompt('Entrer ID du chat'); if(!id) return;
+      const nick = prompt('Entrer votre pseudo');
+      if(!nick) return;
+      await joinChat(id, nick);
+    });
+    document.getElementById('leaveBtn').addEventListener('click', leaveChat);
+
+    document.getElementById('sendBtn').addEventListener('click', async ()=>{
+      const v = document.getElementById('messageInput').value.trim();
+      if(v){ await sendMessage(v); }
+      document.getElementById('messageInput').value='';
+    });
+
+    document.getElementById('messageInput').addEventListener('keydown', async (e)=>{ if(e.key==='Enter'){document.getElementById('sendBtn').click();} });
+
+    document.getElementById('selectImageBtn').addEventListener('click', ()=>{ document.getElementById('filePicker').click(); });
+    document.getElementById('filePicker').addEventListener('change', async (ev)=>{
+      const f = ev.target.files[0]; if(!f) return;
+      const buf = await f.arrayBuffer();
+      const b64 = arrayBufferToBase64(buf);
+      const prefill = `import {\"path\":\"data:image/${(f.type||'png').split('/').pop()};base64,${b64}\",\"type\":\"color\",\"resolution\":0.3}`;
+      document.getElementById('messageInput').value = prefill;
+    });
+
+    appendLine(`     _____                                                                   _____
+    ( ___ )                                                                 ( ___ )
+     |   |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|   |
+     |   |  ____       _      _   _   _____   _   _   _____    ___    _   _  |   |
+     |   | |  _ \     / \    | \ | | |_   _| | | | | | ____|  / _ \  | \ | | |   |
+     |   | | |_) |   / _ \   |  \| |   | |   | |_| | |  _|   | | | | |  \| | |   |
+     |   | |  __/   / ___ \  | |\  |   | |   |  _  | | |___  | |_| | | |\  | |   |
+     |   | |_|     /_/   \_\ |_| \_|   |_|   |_| |_| |_____|  \___/  |_| \_| |   |
+     |___|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|___|
+    (_____)                                                                 (_____)`);
+  </script>
 </body>
 </html>
