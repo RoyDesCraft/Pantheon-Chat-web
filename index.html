@@ -132,17 +132,119 @@
       return res.json();
     }
 
-    async function sendMessage(text){
-  if(!chatId || !nickname) return;
-  try{
-    const resp = await apiPost('/send_message', { chat_id: chatId, nickname: nickname, text });
-    if(resp && resp.error){
-      appendLine(`<SYSTEM> <Erreur envoi: ${resp.error}>`);
+function Send-ImportMessage {
+    param($chatId, $nickname, $msg)
+
+    $start = $msg.IndexOf("{")
+    $end   = $msg.LastIndexOf("}")
+    if ($start -lt 0 -or $end -le $start) {
+        Write-Host "Format import invalide." -ForegroundColor Yellow
+        return
     }
-  }catch(e){
-    appendLine(`<SYSTEM> <Erreur réseau: ${e.message}>`);
-  }
+
+    $content = $msg.Substring($start, $end - $start + 1)
+    $content = $content -replace '\\', '\\\\'
+
+    try {
+        $obj = $content | ConvertFrom-Json -ErrorAction Stop
+
+        if ($obj.path) {
+            $bytes = $null
+
+            # Cas URL
+            if ($obj.path -match "^https?://") {
+                try {
+                    $webClient = New-Object System.Net.WebClient
+                    $bytes = $webClient.DownloadData($obj.path)
+                } catch {
+                    Write-Host "Impossible de télécharger l'image depuis l'URL." -ForegroundColor Yellow
+                    return
+                }
+            } 
+            # Cas fichier local
+            elseif (Test-Path $obj.path) {
+                try {
+                    $bytes = [System.IO.File]::ReadAllBytes($obj.path)
+                } catch {
+                    Write-Host "Impossible de lire le fichier local." -ForegroundColor Yellow
+                    return
+                }
+            } else {
+                Write-Host "Fichier introuvable : $($obj.path)" -ForegroundColor Yellow
+                return
+            }
+
+            # Conversion en Base64
+            if ($bytes) {
+                $obj.path = [System.Convert]::ToBase64String($bytes)
+            }
+        }
+
+        $jsonSend = $obj | ConvertTo-Json -Compress
+        Send-Message -chatId $chatId -nickname $nickname -text "import $jsonSend"
+        Write-Host "Image importée avec succès !" -ForegroundColor Green
+
+    } catch {
+        Write-Host "Format import invalide." -ForegroundColor Yellow
+    }
 }
+function Send-ImportMessage {
+    param($chatId, $nickname, $msg)
+
+    $start = $msg.IndexOf("{")
+    $end   = $msg.LastIndexOf("}")
+    if ($start -lt 0 -or $end -le $start) {
+        Write-Host "Format import invalide." -ForegroundColor Yellow
+        return
+    }
+
+    $content = $msg.Substring($start, $end - $start + 1)
+    $content = $content -replace '\\', '\\\\'
+
+    try {
+        $obj = $content | ConvertFrom-Json -ErrorAction Stop
+
+        if ($obj.path) {
+            $bytes = $null
+
+            # Cas URL
+            if ($obj.path -match "^https?://") {
+                try {
+                    $webClient = New-Object System.Net.WebClient
+                    $bytes = $webClient.DownloadData($obj.path)
+                } catch {
+                    Write-Host "Impossible de télécharger l'image depuis l'URL." -ForegroundColor Yellow
+                    return
+                }
+            } 
+            # Cas fichier local
+            elseif (Test-Path $obj.path) {
+                try {
+                    $bytes = [System.IO.File]::ReadAllBytes($obj.path)
+                } catch {
+                    Write-Host "Impossible de lire le fichier local." -ForegroundColor Yellow
+                    return
+                }
+            } else {
+                Write-Host "Fichier introuvable : $($obj.path)" -ForegroundColor Yellow
+                return
+            }
+
+            # Conversion en Base64
+            if ($bytes) {
+                $obj.path = [System.Convert]::ToBase64String($bytes)
+            }
+        }
+
+        $jsonSend = $obj | ConvertTo-Json -Compress
+        Send-Message -chatId $chatId -nickname $nickname -text "import $jsonSend"
+        Write-Host "Image importée avec succès !" -ForegroundColor Green
+
+    } catch {
+        Write-Host "Format import invalide." -ForegroundColor Yellow
+    }
+}
+
 
 
     async function joinChat(id, nick){
