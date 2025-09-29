@@ -258,11 +258,18 @@
     document.getElementById('selectImageBtn').addEventListener('click', ()=>{ 
       document.getElementById('filePicker').click(); 
     });
-    document.getElementById('filePicker').addEventListener('change', async (ev)=>{
-      const f = ev.target.files[0]; if(!f) return;
-      await sendImportMessage(f);
-      document.getElementById('messageInput').value='';
-    });
+document.getElementById('filePicker').addEventListener('change', async (ev)=>{
+  const f = ev.target.files[0]; 
+  if(!f) return;
+
+  const buf = await f.arrayBuffer();
+  const b64 = arrayBufferToBase64(buf);
+
+  // On préremplit le textbox, mais on n'envoie rien
+  document.getElementById('messageInput').value =
+    `import {"path":"data:image/${(f.type||'png').split('/').pop()};base64,${b64}","type":"color","resolution":0.3}`;
+});
+
 
     appendLine(`     _____                                                                   _____
     ( ___ )                                                                 ( ___ )
