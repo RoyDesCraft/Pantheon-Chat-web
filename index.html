@@ -82,23 +82,46 @@
     let poller = null;
 
     function appendLine(text, options = {}) {
-      const el = document.createElement('div');
-      el.className = 'line';
-      if(options.sender){
-        const span = document.createElement('span');
-        span.className = 'sender';
-        span.textContent = `<${options.sender}>`;
-        span.style.color = options.color || '#fff';
-        el.appendChild(span);
-        const msg = document.createElement('span');
-        msg.textContent = ' ' + text;
-        el.appendChild(msg);
-      } else {
-        el.textContent = text;
-      }
-      output.appendChild(el);
-      output.scrollTop = output.scrollHeight;
+  const ansiRegex = /\x1b\[48;2;(\d+);(\d+);(\d+)m(.*?)\x1b\[0m/g;
+  let match, lastIndex = 0;
+  const el = document.createElement('div');
+  el.className = 'line';
+
+  while((match = ansiRegex.exec(text)) !== null){
+    if(match.index > lastIndex){
+      // texte avant le bloc coloré
+      const t = text.slice(lastIndex, match.index);
+      const span = document.createElement('span');
+      span.textContent = t;
+      el.appendChild(span);
     }
+    // bloc coloré
+    const block = document.createElement('span');
+    block.className = 'color-block';
+    block.style.backgroundColor = `rgb(${match[1]},${match[2]},${match[3]})`;
+    block.textContent = match[2]==match[1]? "  " : match[4] || "  "; // double espace si vide
+    el.appendChild(block);
+    lastIndex = match.index + match[0].length;
+  }
+
+  if(lastIndex < text.length){
+    const span = document.createElement('span');
+    span.textContent = text.slice(lastIndex);
+    el.appendChild(span);
+  }
+
+  if(options.sender){
+    const sender = document.createElement('span');
+    sender.className = 'sender';
+    sender.textContent = `<${options.sender}> `;
+    sender.style.color = options.color || '#fff';
+    el.insertBefore(sender, el.firstChild);
+  }
+
+  output.appendChild(el);
+  output.scrollTop = output.scrollHeight;
+}
+
 
     function setStatus(s){ status.textContent = s; }
 
