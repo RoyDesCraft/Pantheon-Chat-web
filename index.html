@@ -135,7 +135,7 @@
     async function sendMessage(text){
   if(!chatId || !nickname) return;
   try{
-    const resp = await apiPost('/send_message', { chat_id: chatId, nickname: nickname, message });
+    const resp = await apiPost('/send_message', { chat_id: chatId, nickname: nickname, text });
     if(resp && resp.error){
       appendLine(`<SYSTEM> <Erreur envoi: ${resp.error}>`);
     }
