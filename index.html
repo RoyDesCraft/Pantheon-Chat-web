@@ -5,23 +5,24 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pantheon Chat — Terminal</title>
   <style>
-    :root{--bg:#000;--panel:#061006;--text:#9aff8a;--muted:#5a8457;--accent:#5af;--glass:rgba(255,255,255,0.03)}
-    html,body{height:100%;margin:0;font-family:ui-monospace, "Roboto Mono", "Courier New", monospace;background:linear-gradient(180deg,#000 0%,#021010 100%);color:var(--text)}
-    .wrap{max-width:1100px;margin:18px auto;padding:12px;border-radius:8px;background:linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.4));box-shadow:0 10px 40px rgba(0,0,0,0.9);border:1px solid rgba(90,160,90,0.06)}
+    :root{--bg:#000;--panel:#061006;--text:#9aff8a;--muted:#5a8457;--accent:#5af;--error:#ff5a5a;--glass:rgba(255,255,255,0.03)}
+    html,body{height:100%;margin:0;font-family:ui-monospace,"Courier New",monospace;background:linear-gradient(180deg,#000 0%,#021010 100%);color:var(--text)}
+    .wrap{max-width:1100px;margin:18px auto;padding:12px;border-radius:8px;background:linear-gradient(180deg,rgba(0,0,0,0.6),rgba(0,0,0,0.4));box-shadow:0 10px 40px rgba(0,0,0,0.9);border:1px solid rgba(90,160,90,0.06)}
     header{display:flex;align-items:center;gap:12px}
     .title{font-size:16px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px}
-    .controls{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .controls{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
     button{background:transparent;border:1px solid rgba(90,160,90,0.12);color:var(--text);padding:6px 10px;border-radius:6px;cursor:pointer;font-family:inherit}
     button:active{transform:translateY(1px)}
     main{margin-top:12px;display:none;grid-template-columns:1fr 320px;gap:12px}
     .terminal{background:#001000;border-radius:6px;padding:10px;min-height:520px;display:flex;flex-direction:column;box-shadow:inset 0 0 60px rgba(0,160,0,0.02)}
-    .output{flex:1;overflow:auto;padding:10px;background:linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.05));border-radius:6px;font-size:13px;color:var(--text);line-height:1.45}
+    .output{flex:1;overflow:auto;padding:10px;background:linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.05));border-radius:6px;font-size:13px;line-height:1.45}
     .prompt{display:flex;gap:8px;align-items:center;margin-top:10px}
     .input{flex:1;display:flex}
-    input[type="text"], textarea{width:100%;padding:10px;border-radius:6px;background:transparent;border:1px solid rgba(90,160,90,0.06);color:var(--text);outline:none;font-family:inherit}
-    .sidebar{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
+    input[type="text"],textarea{width:100%;padding:10px;border-radius:6px;background:transparent;border:1px solid rgba(90,160,90,0.06);color:var(--text);outline:none;font-family:inherit}
+    .sidebar{background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.00));padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
     .meta{font-size:12px;color:var(--muted);margin-bottom:8px}
     .line{white-space:pre-wrap;font-family:inherit;font-size:13px;margin:6px 0;word-break:break-word}
+    .line.error{color:var(--error)}
     .sender{font-weight:700;margin-right:6px;color:#b6ffb6}
     .small{font-size:12px;color:var(--muted)}
     .msg-img{max-width:320px;border-radius:6px;display:block;margin-top:6px;border:1px solid rgba(90,160,90,0.06)}
@@ -108,16 +109,26 @@
     let poller = null
     let lastIndex = 0
 
-    function AppendLine(text, options = {}) {
+    function Log(msg, sender='SYSTEM', isError=false){
       const el = document.createElement('div')
-      el.className = 'line'
-      if(options.sender){
+      el.className = 'line' + (isError ? ' error' : '')
+      const s = document.createElement('span')
+      s.className = 'sender'
+      s.textContent = `<${sender}> `
+      el.appendChild(s)
+      el.appendChild(document.createTextNode(msg))
+      Output.appendChild(el)
+      Output.scrollTop = Output.scrollHeight
+    }
+
+    function AppendLine(text, options={}){
+      if(options.isImage){
+        const el = document.createElement('div')
+        el.className = 'line'
         const s = document.createElement('span')
         s.className = 'sender'
-        s.textContent = `<${options.sender}> `
+        s.textContent = `<${options.sender || 'SYSTEM'}> `
         el.appendChild(s)
-      }
-      if(options.isImage){
         const a = document.createElement('a')
         a.href = text
         a.target = '_blank'
@@ -129,10 +140,20 @@
         img.src = text
         img.className = 'msg-img'
         el.appendChild(img)
-      } else {
-        const nodes = LinkifyNodes(text)
-        nodes.forEach(n => el.appendChild(n))
+        Output.appendChild(el)
+        Output.scrollTop = Output.scrollHeight
+        return
       }
+      const nodes = LinkifyNodes(text)
+      const el = document.createElement('div')
+      el.className = 'line'
+      if(options.sender){
+        const s = document.createElement('span')
+        s.className = 'sender'
+        s.textContent = `<${options.sender}> `
+        el.appendChild(s)
+      }
+      nodes.forEach(n => el.appendChild(n))
       Output.appendChild(el)
       Output.scrollTop = Output.scrollHeight
     }
@@ -158,133 +179,116 @@
     }
 
     async function ApiPost(path, body){
-      const res = await fetch(API_BASE + path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(body)
-      })
-      return res.json()
+      try{
+        const res = await fetch(API_BASE + path, {
+          method:'POST',
+          headers:{'Content-Type':'application/json; charset=utf-8'},
+          body: JSON.stringify(body)
+        })
+        if(!res.ok) throw new Error('HTTP '+res.status)
+        const j = await res.json()
+        Log('POST ' + path + ' -> ' + JSON.stringify(j))
+        return j
+      }catch(e){
+        Log('Erreur POST ' + path + ': ' + e.message,'SYSTEM',true)
+        return { error:e.message }
+      }
     }
 
     async function ApiGet(path){
-      const res = await fetch(API_BASE + path)
-      return res.json()
+      try{
+        const res = await fetch(API_BASE + path)
+        if(!res.ok) throw new Error('HTTP '+res.status)
+        const j = await res.json()
+        Log('GET ' + path + ' -> ' + JSON.stringify(j))
+        return j
+      }catch(e){
+        Log('Erreur GET ' + path + ': ' + e.message,'SYSTEM',true)
+        return { error:e.message }
+      }
     }
 
     async function SendMessage(text){
-      if(!chatId || !nickname) return
-      await ApiPost('/send_message', { chat_id: chatId, nickname, text })
+      if(!chatId||!nickname) return
+      await ApiPost('/send_message',{chat_id:chatId,nickname,text})
     }
 
     async function UploadImage(file){
-      if(!chatId || !nickname) return
+      if(!chatId||!nickname) return
       const fd = new FormData()
-      fd.append('chat_id', chatId)
-      fd.append('nickname', nickname)
-      fd.append('file', file)
-      const res = await fetch(API_BASE + '/upload_image', { method: 'POST', body: fd })
-      const j = await res.json()
-      if(j && j.url){
-        AppendLine(j.url, { sender: nickname, isImage: true })
-      } else {
-        AppendLine('Erreur upload', { sender: 'SYSTEM' })
-      }
+      fd.append('chat_id',chatId)
+      fd.append('nickname',nickname)
+      fd.append('file',file)
+      try{
+        const res = await fetch(API_BASE+'/upload_image',{method:'POST',body:fd})
+        const j = await res.json()
+        if(j && j.url) AppendLine(j.url,{sender:nickname,isImage:true})
+        else Log('Erreur upload','SYSTEM',true)
+      }catch(e){ Log('Erreur upload: '+e.message,'SYSTEM',true) }
     }
 
     async function GetMessages(){
       if(!chatId) return
-      try{
-        const resp = await ApiGet(`/get_messages/${chatId}/${lastIndex}`)
-        if(resp && resp.messages){
-          for(const msg of resp.messages){
-            if(msg.type === 'image'){
-              AppendLine(msg.url, { sender: msg.sender, isImage: true })
-            } else {
-              AppendLine(msg.text, { sender: msg.sender })
-            }
-            lastIndex = Math.max(lastIndex, (msg.index || 0) + 1)
-          }
+      const resp = await ApiGet(`/get_messages/${chatId}/${lastIndex}`)
+      if(resp && resp.messages){
+        for(const msg of resp.messages){
+          if(msg.type==='image') AppendLine(msg.url,{sender:msg.sender,isImage:true})
+          else AppendLine(msg.text,{sender:msg.sender})
+          lastIndex = Math.max(lastIndex,(msg.index||0)+1)
         }
-      }catch(e){
-        AppendLine('Erreur get_messages', { sender: 'SYSTEM' })
       }
     }
 
-    function StartPolling(){ if(poller) return; poller = setInterval(GetMessages, 1200) }
-    function StopPolling(){ if(!poller) return; clearInterval(poller); poller = null }
+    function StartPolling(){ if(poller) return; poller=setInterval(GetMessages,1200) }
+    function StopPolling(){ if(!poller) return; clearInterval(poller); poller=null }
 
     async function JoinChatFlow(kind){
-      const id = prompt('Entrer ID du chat')
-      if(!id) return
-      const nick = prompt('Entrez votre pseudo')
-      if(!nick) return
-      let pwd = ''
-      if(kind === 'locked') pwd = prompt('Mot de passe du chat') || ''
-      setStatus('Tentative de rejoindre...')
-      const resp = await ApiPost('/join', { chat_id: id, nickname: nick, password: pwd })
+      const id = prompt('Entrer ID du chat'); if(!id) return
+      const nick = prompt('Pseudo'); if(!nick) return
+      let pwd = (kind==='locked') ? (prompt('Mot de passe')||'') : ''
+      setStatus('Tentative de connexion...')
+      const resp = await ApiPost('/join',{chat_id:id,nickname:nick,password:pwd})
       if(resp && !resp.error){
-        chatId = id
-        nickname = nick
-        ChatIdDisplay.textContent = chatId
-        NickDisplay.textContent = nickname
-        AppendLine(`Vous avez rejoint le chat: ${chatId}`, { sender: 'SYSTEM' })
-        setStatus('Connecté')
-        ChatUI.style.display = 'grid'
-        lastIndex = 0
+        chatId=id; nickname=nick
+        ChatIdDisplay.textContent=chatId; NickDisplay.textContent=nickname
+        AppendLine(`Vous avez rejoint le chat: ${chatId}`,{sender:'SYSTEM'})
+        setStatus('Connecté'); ChatUI.style.display='grid'; lastIndex=0
         StartPolling()
-      } else {
-        AppendLine('Impossible de rejoindre: ' + (resp.error || JSON.stringify(resp)), { sender: 'SYSTEM' })
-        setStatus('Erreur')
-      }
+      } else AppendLine('Impossible de rejoindre: '+(resp.error||JSON.stringify(resp)),{sender:'SYSTEM'})
     }
 
     async function CreateChatFlow(kind){
-      const nick = prompt('Pseudo')
-      if(!nick) return
-      let pwd = ''
-      if(kind === 'locked') pwd = prompt('Choisissez un mot de passe') || ''
-      const persistent = (kind === 'persistent')
-      const resp = await ApiPost('/create_chat', { password: pwd || '', persistent: !!persistent })
+      const nick = prompt('Pseudo'); if(!nick) return
+      let pwd = (kind==='locked')? (prompt('Choisissez un mot de passe')||'') : ''
+      const persistent = (kind==='persistent')
+      const resp = await ApiPost('/create_chat',{password:pwd||'',persistent:!!persistent})
       if(resp && resp.chat_id){
-        AppendLine('Chat créé, ID: ' + resp.chat_id, { sender: 'SYSTEM' })
-        await JoinChatFlowAfterCreate(resp.chat_id, nick, pwd)
-      } else {
-        AppendLine('Erreur création', { sender: 'SYSTEM' })
-      }
+        AppendLine('Chat créé, ID: '+resp.chat_id,{sender:'SYSTEM'})
+        await JoinChatFlowAfterCreate(resp.chat_id,nick,pwd)
+      } else AppendLine('Erreur création',{sender:'SYSTEM',isError:true})
     }
 
-    async function JoinChatFlowAfterCreate(id, nick, pwd){
-      const resp = await ApiPost('/join', { chat_id: id, nickname: nick, password: pwd || '' })
+    async function JoinChatFlowAfterCreate(id,nick,pwd){
+      const resp = await ApiPost('/join',{chat_id:id,nickname:nick,password:pwd||''})
       if(resp && !resp.error){
-        chatId = id
-        nickname = nick
-        ChatIdDisplay.textContent = chatId
-        NickDisplay.textContent = nickname
-        AppendLine(`Vous avez rejoint le chat: ${chatId}`, { sender: 'SYSTEM' })
-        setStatus('Connecté')
-        ChatUI.style.display = 'grid'
-        lastIndex = 0
+        chatId=id; nickname=nick
+        ChatIdDisplay.textContent=chatId; NickDisplay.textContent=nickname
+        AppendLine(`Vous avez rejoint le chat: ${chatId}`,{sender:'SYSTEM'})
+        setStatus('Connecté'); ChatUI.style.display='grid'; lastIndex=0
         StartPolling()
-      } else {
-        AppendLine('Impossible de rejoindre après création: ' + (resp.error || JSON.stringify(resp)), { sender: 'SYSTEM' })
-        setStatus('Erreur')
-      }
+      } else AppendLine('Impossible de rejoindre après création: '+(resp.error||JSON.stringify(resp)),{sender:'SYSTEM',isError:true})
     }
 
     async function LeaveChat(){
-      if(!chatId || !nickname) return
-      await ApiPost('/leave', { chat_id: chatId, nickname })
-      AppendLine('Vous avez quitté le chat.', { sender: 'SYSTEM' })
-      chatId = null
-      nickname = null
-      ChatIdDisplay.textContent = '—'
-      NickDisplay.textContent = '—'
-      setStatus('Pas connecté')
-      StopPolling()
-      ChatUI.style.display = 'none'
+      if(!chatId||!nickname) return
+      await ApiPost('/leave',{chat_id:chatId,nickname})
+      AppendLine('Vous avez quitté le chat.',{sender:'SYSTEM'})
+      chatId=null; nickname=null
+      ChatIdDisplay.textContent='—'; NickDisplay.textContent='—'
+      setStatus('Pas connecté'); StopPolling(); ChatUI.style.display='none'
     }
 
-    function setStatus(s){ Status.textContent = s }
+    function setStatus(s){ Status.textContent=s }
 
     document.getElementById('createEphemeral').addEventListener('click', ()=> CreateChatFlow('ephemeral'))
     document.getElementById('createPersistent').addEventListener('click', ()=> CreateChatFlow('persistent'))
@@ -297,26 +301,23 @@
     document.getElementById('leaveBtn').addEventListener('click', LeaveChat)
     document.getElementById('sendBtn').addEventListener('click', async ()=>{
       const v = document.getElementById('messageInput').value.trim()
-      if(!v) return
-      await SendMessage(v)
-      document.getElementById('messageInput').value = ''
+      if(!v) return; await SendMessage(v)
+      document.getElementById('messageInput').value=''
     })
     document.getElementById('messageInput').addEventListener('keydown', async (e)=>{
-      if(e.key === 'Enter') document.getElementById('sendBtn').click()
-      if(e.ctrlKey && e.key.toLowerCase() === 'u') document.getElementById('selectImageBtn').click()
-      if(e.ctrlKey && e.key.toLowerCase() === 'r') GetMessages()
+      if(e.key==='Enter') document.getElementById('sendBtn').click()
+      if(e.ctrlKey&&e.key.toLowerCase()==='u') document.getElementById('selectImageBtn').click()
+      if(e.ctrlKey&&e.key.toLowerCase()==='r') GetMessages()
     })
     document.getElementById('selectImageBtn').addEventListener('click', ()=> FilePicker.click())
     FilePicker.addEventListener('change', async (ev)=>{
-      const f = ev.target.files[0]
-      if(!f) return
-      await UploadImage(f)
-      FilePicker.value = ''
+      const f=ev.target.files[0]; if(!f) return
+      await UploadImage(f); FilePicker.value=''
     })
     document.getElementById('refreshBtn').addEventListener('click', GetMessages)
-    document.getElementById('clearLocalBtn').addEventListener('click', ()=> { Output.innerHTML = '' })
+    document.getElementById('clearLocalBtn').addEventListener('click', ()=> { Output.innerHTML='' })
 
-    AppendLine("pantheon init\n> awaiting input", { sender: 'SYSTEM' })
+    Log("pantheon init\n> awaiting input")
   </script>
 </body>
 </html>
