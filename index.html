@@ -1,323 +1,225 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Pantheon Chat — Terminal</title>
-  <style>
-    :root{--bg:#000;--panel:#061006;--text:#9aff8a;--muted:#5a8457;--accent:#5af;--error:#ff5a5a;--glass:rgba(255,255,255,0.03)}
-    html,body{height:100%;margin:0;font-family:ui-monospace,"Courier New",monospace;background:linear-gradient(180deg,#000 0%,#021010 100%);color:var(--text)}
-    .wrap{max-width:1100px;margin:18px auto;padding:12px;border-radius:8px;background:linear-gradient(180deg,rgba(0,0,0,0.6),rgba(0,0,0,0.4));box-shadow:0 10px 40px rgba(0,0,0,0.9);border:1px solid rgba(90,160,90,0.06)}
-    header{display:flex;align-items:center;gap:12px}
-    .title{font-size:16px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px}
-    .controls{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-    button{background:transparent;border:1px solid rgba(90,160,90,0.12);color:var(--text);padding:6px 10px;border-radius:6px;cursor:pointer;font-family:inherit}
-    button:active{transform:translateY(1px)}
-    main{margin-top:12px;display:none;grid-template-columns:1fr 320px;gap:12px}
-    .terminal{background:#001000;border-radius:6px;padding:10px;min-height:520px;display:flex;flex-direction:column;box-shadow:inset 0 0 60px rgba(0,160,0,0.02)}
-    .output{flex:1;overflow:auto;padding:10px;background:linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.05));border-radius:6px;font-size:13px;line-height:1.45}
-    .prompt{display:flex;gap:8px;align-items:center;margin-top:10px}
-    .input{flex:1;display:flex}
-    input[type="text"],textarea{width:100%;padding:10px;border-radius:6px;background:transparent;border:1px solid rgba(90,160,90,0.06);color:var(--text);outline:none;font-family:inherit}
-    .sidebar{background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.00));padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
-    .meta{font-size:12px;color:var(--muted);margin-bottom:8px}
-    .line{white-space:pre-wrap;font-family:inherit;font-size:13px;margin:6px 0;word-break:break-word}
-    .line.error{color:var(--error)}
-    .sender{font-weight:700;margin-right:6px;color:#b6ffb6}
-    .small{font-size:12px;color:var(--muted)}
-    .msg-img{max-width:320px;border-radius:6px;display:block;margin-top:6px;border:1px solid rgba(90,160,90,0.06)}
-    .link{color:var(--accent);text-decoration:underline}
-    .topbar{display:flex;gap:8px;align-items:center;margin-top:8px}
-    .mode-pill{padding:6px 8px;border-radius:999px;border:1px solid rgba(90,160,90,0.08);font-size:12px;color:var(--muted)}
-    .cursor{display:inline-block;width:8px;height:18px;background:var(--text);vertical-align:middle;margin-left:6px;animation:blink 1s steps(2,start) infinite}
-    @keyframes blink{50%{opacity:0}}
-    .create-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-left:12px}
-    .chat-btn{font-size:13px;padding:6px;border-radius:6px}
-    .header-left{display:flex;flex-direction:column}
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Pantheon Chat — Terminal iPad</title>
+<style>
+:root {
+  --bg:#000;
+  --panel:#061006;
+  --text:#9aff8a;
+  --muted:#5a8457;
+  --accent:#5af;
+}
+html,body{height:100%;margin:0;font-family:ui-monospace, "Courier New", monospace;background:var(--bg);color:var(--text);}
+.wrap{display:flex;flex-direction:column;height:100%;padding:10px;}
+.terminal{flex:1;display:flex;flex-direction:column;background:var(--panel);border-radius:6px;padding:10px;overflow:hidden;box-shadow:inset 0 0 40px rgba(0,160,0,0.2);}
+.output{flex:1;overflow:auto;padding:8px;font-size:13px;line-height:1.4;}
+.input-line{display:flex;gap:6px;align-items:center;margin-top:4px;}
+input[type="text"]{flex:1;padding:8px;background:transparent;border:1px solid rgba(90,160,90,0.2);border-radius:4px;color:var(--text);outline:none;font-family:inherit;}
+button{padding:6px 10px;border-radius:4px;background:transparent;border:1px solid rgba(90,160,90,0.2);color:var(--text);}
+.sender{font-weight:700;margin-right:6px;color:#b6ffb6;}
+.msg-img{max-width:100%;border-radius:6px;margin-top:4px;}
+.link{color:var(--accent);text-decoration:underline;}
+.cursor{display:inline-block;width:8px;height:18px;background:var(--text);vertical-align:middle;animation:blink 1s steps(2,start) infinite;}
+@keyframes blink{50%{opacity:0}}
+.topbar{display:flex;gap:6px;margin-bottom:4px;}
+.mode-pill{padding:4px 6px;border-radius:999px;border:1px solid rgba(90,160,90,0.2);font-size:12px;color:var(--muted);}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="header-left">
-        <div class="title">pantheon — terminal</div>
-        <div class="small" style="color:var(--muted)">messagerie anonyme & éphémère</div>
-      </div>
-
-      <div class="controls">
-        <div class="create-grid" style="align-items:center">
-          <button id="createEphemeral" class="chat-btn">Créer — éphémère</button>
-          <button id="createPersistent" class="chat-btn">Créer — salon</button>
-          <button id="createLocked" class="chat-btn">Créer — verrouillé</button>
-        </div>
-        <div class="create-grid" style="margin-left:6px;align-items:center">
-          <button id="joinEphemeral" class="chat-btn">Rejoindre — éphémère</button>
-          <button id="joinPersistent" class="chat-btn">Rejoindre — salon</button>
-          <button id="joinLocked" class="chat-btn">Rejoindre — verrouillé</button>
-        </div>
-        <button id="leaveBtn">Quitter</button>
-      </div>
-    </header>
-
-    <main id="chatUI">
-      <section class="terminal">
-        <div class="output" id="output" aria-live="polite"></div>
-
-        <div class="prompt">
-          <div class="input">
-            <input id="messageInput" type="text" placeholder="Tapez votre message. Les commandes commencent par / (ex: /clear)" />
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <button id="sendBtn">Envoyer</button>
-            <button id="selectImageBtn">Image</button>
-            <input id="filePicker" type="file" accept="image/*" style="display:none" />
-          </div>
-        </div>
-        <div style="margin-top:8px;color:var(--muted);font-size:12px">Entrée: ↩︎ • Raccourci upload: Ctrl+U • Refresh: Ctrl+R <span class="cursor" id="fakeCursor"></span></div>
-      </section>
-
-      <aside class="sidebar">
-        <div class="meta">État</div>
-        <div id="status" class="small">Pas connecté</div>
-        <div style="height:10px"></div>
-        <div class="meta">Chat ID</div>
-        <div id="chatIdDisplay" class="small">—</div>
-        <div style="height:10px"></div>
-        <div class="meta">Pseudo</div>
-        <div id="nickDisplay" class="small">—</div>
-        <div style="height:12px"></div>
-        <div class="meta">Actions</div>
-        <div style="display:flex;gap:8px">
-          <button id="refreshBtn">Refresh</button>
-          <button id="clearLocalBtn">Clear écran</button>
-        </div>
-      </aside>
-    </main>
+<div class="wrap">
+  <div class="topbar">
+    <div class="mode-pill" id="mode">Déconnecté</div>
+    <div class="mode-pill" id="chatId">—</div>
+    <div class="mode-pill" id="nickname">—</div>
+    <button id="clearBtn">/clear écran</button>
+    <button id="refreshBtn">/refresh</button>
+    <input type="file" id="filePicker" accept="image/*" style="display:none"/>
+    <button id="uploadBtn">Image</button>
   </div>
+  <div class="terminal">
+    <div class="output" id="output"></div>
+    <div class="input-line">
+      <span>&gt;</span>
+      <input id="commandInput" type="text" placeholder="Tapez une commande ou message (ex: /help)">
+      <span class="cursor" id="cursor"></span>
+    </div>
+  </div>
+</div>
 
-  <script>
-    const API_BASE = 'https://pantheon-chat.onrender.com'
-    const Output = document.getElementById('output')
-    const NickDisplay = document.getElementById('nickDisplay')
-    const ChatIdDisplay = document.getElementById('chatIdDisplay')
-    const Status = document.getElementById('status')
-    const ChatUI = document.getElementById('chatUI')
-    const FilePicker = document.getElementById('filePicker')
+<script>
+const API_BASE = 'https://pantheon-chat.onrender.com';
+const Output = document.getElementById('output');
+const CommandInput = document.getElementById('commandInput');
+const ModePill = document.getElementById('mode');
+const ChatIdPill = document.getElementById('chatId');
+const NickPill = document.getElementById('nickname');
+const ClearBtn = document.getElementById('clearBtn');
+const RefreshBtn = document.getElementById('refreshBtn');
+const FilePicker = document.getElementById('filePicker');
+const UploadBtn = document.getElementById('uploadBtn');
 
-    let chatId = null
-    let nickname = null
-    let poller = null
-    let lastIndex = 0
+let chatId = null;
+let nickname = null;
+let poller = null;
+let lastIndex = 0;
 
-    function Log(msg, sender='SYSTEM', isError=false){
-      const el = document.createElement('div')
-      el.className = 'line' + (isError ? ' error' : '')
-      const s = document.createElement('span')
-      s.className = 'sender'
-      s.textContent = `<${sender}> `
-      el.appendChild(s)
-      el.appendChild(document.createTextNode(msg))
-      Output.appendChild(el)
-      Output.scrollTop = Output.scrollHeight
+function appendLine(text, options={}) {
+  const el = document.createElement('div');
+  el.className = 'line';
+  if(options.sender){
+    const s = document.createElement('span');
+    s.className='sender';
+    s.textContent = `<${options.sender}> `;
+    el.appendChild(s);
+  }
+  if(options.isImage){
+    const a = document.createElement('a');
+    a.href = text;
+    a.target='_blank';
+    a.rel='noopener';
+    a.className='link';
+    a.textContent = text;
+    el.appendChild(a);
+    const img = document.createElement('img');
+    img.src = text;
+    img.className='msg-img';
+    el.appendChild(img);
+  } else {
+    const nodes = linkify(text);
+    nodes.forEach(n=>el.appendChild(n));
+  }
+  Output.appendChild(el);
+  Output.scrollTop = Output.scrollHeight;
+}
+
+function linkify(text){
+  const regex = /(https?:\/\/[^\s]+)/g;
+  const parts = [];
+  let last=0, m;
+  while((m=regex.exec(text))!==null){
+    if(m.index>last) parts.push(document.createTextNode(text.slice(last,m.index)));
+    const a=document.createElement('a');
+    a.href=m[0];
+    a.textContent=m[0];
+    a.target='_blank';
+    a.rel='noopener';
+    a.className='link';
+    parts.push(a);
+    last=m.index+m[0].length;
+  }
+  if(last<text.length) parts.push(document.createTextNode(text.slice(last)));
+  return parts;
+}
+
+async function apiPost(path, body){
+  const res = await fetch(API_BASE+path,{
+    method:'POST',
+    headers:{'Content-Type':'application/json; charset=utf-8'},
+    body:JSON.stringify(body)
+  });
+  return res.json();
+}
+
+async function apiGet(path){
+  const res = await fetch(API_BASE+path);
+  return res.json();
+}
+
+async function sendMessage(text){
+  if(!chatId||!nickname) return;
+  if(text.startsWith('/')){
+    await handleCommand(text);
+    return;
+  }
+  await apiPost('/send_message',{chat_id:chatId,nickname,text});
+}
+
+async function handleCommand(cmd){
+  const parts=cmd.split(' ');
+  const c=parts[0].toLowerCase();
+  if(c==='/help'){
+    appendLine("Commandes disponibles: /create [ephemeral|persistent|locked] PSEUDO [MDP] /join CHATID PSEUDO [MDP] /clear /refresh /help",{sender:'SYSTEM'});
+  } else if(c==='/clear'){
+    Output.innerHTML='';
+  } else if(c==='/refresh'){
+    await getMessages();
+  } else if(c==='/create'){
+    const kind=parts[1]||'ephemeral';
+    const nick=parts[2]||'Anon';
+    const pwd=parts[3]||'';
+    const persistent=(kind==='persistent');
+    const resp=await apiPost('/create_chat',{password:pwd,persistent:persistent});
+    if(resp.chat_id){
+      appendLine('Chat créé, ID: '+resp.chat_id,{sender:'SYSTEM'});
+      await joinChat(resp.chat_id,nick,pwd);
+    } else appendLine('Erreur création',{sender:'SYSTEM'});
+  } else if(c==='/join'){
+    const id=parts[1];
+    const nick=parts[2]||'Anon';
+    const pwd=parts[3]||'';
+    if(!id){ appendLine('Syntaxe: /join CHATID PSEUDO [MDP]',{sender:'SYSTEM'}); return; }
+    await joinChat(id,nick,pwd);
+  } else appendLine('Commande inconnue: '+cmd,{sender:'SYSTEM'});
+}
+
+async function joinChat(id,nick,pwd){
+  const resp=await apiPost('/join',{chat_id:id,nickname:nick,password:pwd});
+  if(resp && !resp.error){
+    chatId=id;
+    nickname=nick;
+    ChatIdPill.textContent=id;
+    NickPill.textContent=nick;
+    ModePill.textContent='Connecté';
+    lastIndex=0;
+    startPolling();
+    appendLine(`Vous avez rejoint le chat ${id}`,{sender:'SYSTEM'});
+  } else appendLine('Impossible de rejoindre: '+(resp.error||JSON.stringify(resp)),{sender:'SYSTEM'});
+}
+
+async function getMessages(){
+  if(!chatId) return;
+  const resp=await apiGet(`/get_messages/${chatId}/${lastIndex}`);
+  if(resp && resp.messages){
+    for(const msg of resp.messages){
+      if(msg.type==='image'){
+        appendLine(msg.url,{sender:msg.sender,isImage:true});
+      } else appendLine(msg.text,{sender:msg.sender});
+      lastIndex=Math.max(lastIndex,(msg.index||0)+1);
     }
+  }
+}
 
-    function AppendLine(text, options={}){
-      if(options.isImage){
-        const el = document.createElement('div')
-        el.className = 'line'
-        const s = document.createElement('span')
-        s.className = 'sender'
-        s.textContent = `<${options.sender || 'SYSTEM'}> `
-        el.appendChild(s)
-        const a = document.createElement('a')
-        a.href = text
-        a.target = '_blank'
-        a.rel = 'noopener'
-        a.textContent = text
-        a.className = 'link'
-        el.appendChild(a)
-        const img = document.createElement('img')
-        img.src = text
-        img.className = 'msg-img'
-        el.appendChild(img)
-        Output.appendChild(el)
-        Output.scrollTop = Output.scrollHeight
-        return
-      }
-      const nodes = LinkifyNodes(text)
-      const el = document.createElement('div')
-      el.className = 'line'
-      if(options.sender){
-        const s = document.createElement('span')
-        s.className = 'sender'
-        s.textContent = `<${options.sender}> `
-        el.appendChild(s)
-      }
-      nodes.forEach(n => el.appendChild(n))
-      Output.appendChild(el)
-      Output.scrollTop = Output.scrollHeight
-    }
+function startPolling(){ if(poller) return; poller=setInterval(getMessages,1200); }
+function stopPolling(){ if(!poller) return; clearInterval(poller); poller=null; }
 
-    function LinkifyNodes(text){
-      const urlRegex = /(https?:\/\/[^\s]+)/g
-      const parts = []
-      let last = 0
-      let m
-      while((m = urlRegex.exec(text)) !== null){
-        if(m.index > last) parts.push(document.createTextNode(text.slice(last, m.index)))
-        const a = document.createElement('a')
-        a.href = m[0]
-        a.textContent = m[0]
-        a.target = '_blank'
-        a.rel = 'noopener'
-        a.className = 'link'
-        parts.push(a)
-        last = m.index + m[0].length
-      }
-      if(last < text.length) parts.push(document.createTextNode(text.slice(last)))
-      return parts
-    }
+CommandInput.addEventListener('keydown',async e=>{
+  if(e.key==='Enter'){
+    const v=CommandInput.value.trim();
+    if(v){ await sendMessage(v); }
+    CommandInput.value='';
+  }
+});
 
-    async function ApiPost(path, body){
-      try{
-        const res = await fetch(API_BASE + path, {
-          method:'POST',
-          headers:{'Content-Type':'application/json; charset=utf-8'},
-          body: JSON.stringify(body)
-        })
-        if(!res.ok) throw new Error('HTTP '+res.status)
-        const j = await res.json()
-        Log('POST ' + path + ' -> ' + JSON.stringify(j))
-        return j
-      }catch(e){
-        Log('Erreur POST ' + path + ': ' + e.message,'SYSTEM',true)
-        return { error:e.message }
-      }
-    }
+ClearBtn.addEventListener('click',()=>{ Output.innerHTML=''; });
+RefreshBtn.addEventListener('click',getMessages);
+UploadBtn.addEventListener('click',()=>FilePicker.click());
+FilePicker.addEventListener('change',async ev=>{
+  const f=ev.target.files[0];
+  if(!f) return;
+  const fd=new FormData();
+  fd.append('chat_id',chatId);
+  fd.append('nickname',nickname);
+  fd.append('file',f);
+  const res=await fetch(API_BASE+'/upload_image',{method:'POST',body:fd});
+  const j=await res.json();
+  if(j && j.url) appendLine(j.url,{sender:nickname,isImage:true});
+  else appendLine('Erreur upload',{sender:'SYSTEM'});
+});
 
-    async function ApiGet(path){
-      try{
-        const res = await fetch(API_BASE + path)
-        if(!res.ok) throw new Error('HTTP '+res.status)
-        const j = await res.json()
-        Log('GET ' + path + ' -> ' + JSON.stringify(j))
-        return j
-      }catch(e){
-        Log('Erreur GET ' + path + ': ' + e.message,'SYSTEM',true)
-        return { error:e.message }
-      }
-    }
-
-    async function SendMessage(text){
-      if(!chatId||!nickname) return
-      await ApiPost('/send_message',{chat_id:chatId,nickname,text})
-    }
-
-    async function UploadImage(file){
-      if(!chatId||!nickname) return
-      const fd = new FormData()
-      fd.append('chat_id',chatId)
-      fd.append('nickname',nickname)
-      fd.append('file',file)
-      try{
-        const res = await fetch(API_BASE+'/upload_image',{method:'POST',body:fd})
-        const j = await res.json()
-        if(j && j.url) AppendLine(j.url,{sender:nickname,isImage:true})
-        else Log('Erreur upload','SYSTEM',true)
-      }catch(e){ Log('Erreur upload: '+e.message,'SYSTEM',true) }
-    }
-
-    async function GetMessages(){
-      if(!chatId) return
-      const resp = await ApiGet(`/get_messages/${chatId}/${lastIndex}`)
-      if(resp && resp.messages){
-        for(const msg of resp.messages){
-          if(msg.type==='image') AppendLine(msg.url,{sender:msg.sender,isImage:true})
-          else AppendLine(msg.text,{sender:msg.sender})
-          lastIndex = Math.max(lastIndex,(msg.index||0)+1)
-        }
-      }
-    }
-
-    function StartPolling(){ if(poller) return; poller=setInterval(GetMessages,1200) }
-    function StopPolling(){ if(!poller) return; clearInterval(poller); poller=null }
-
-    async function JoinChatFlow(kind){
-      const id = prompt('Entrer ID du chat'); if(!id) return
-      const nick = prompt('Pseudo'); if(!nick) return
-      let pwd = (kind==='locked') ? (prompt('Mot de passe')||'') : ''
-      setStatus('Tentative de connexion...')
-      const resp = await ApiPost('/join',{chat_id:id,nickname:nick,password:pwd})
-      if(resp && !resp.error){
-        chatId=id; nickname=nick
-        ChatIdDisplay.textContent=chatId; NickDisplay.textContent=nickname
-        AppendLine(`Vous avez rejoint le chat: ${chatId}`,{sender:'SYSTEM'})
-        setStatus('Connecté'); ChatUI.style.display='grid'; lastIndex=0
-        StartPolling()
-      } else AppendLine('Impossible de rejoindre: '+(resp.error||JSON.stringify(resp)),{sender:'SYSTEM'})
-    }
-
-    async function CreateChatFlow(kind){
-      const nick = prompt('Pseudo'); if(!nick) return
-      let pwd = (kind==='locked')? (prompt('Choisissez un mot de passe')||'') : ''
-      const persistent = (kind==='persistent')
-      const resp = await ApiPost('/create_chat',{password:pwd||'',persistent:!!persistent})
-      if(resp && resp.chat_id){
-        AppendLine('Chat créé, ID: '+resp.chat_id,{sender:'SYSTEM'})
-        await JoinChatFlowAfterCreate(resp.chat_id,nick,pwd)
-      } else AppendLine('Erreur création',{sender:'SYSTEM',isError:true})
-    }
-
-    async function JoinChatFlowAfterCreate(id,nick,pwd){
-      const resp = await ApiPost('/join',{chat_id:id,nickname:nick,password:pwd||''})
-      if(resp && !resp.error){
-        chatId=id; nickname=nick
-        ChatIdDisplay.textContent=chatId; NickDisplay.textContent=nickname
-        AppendLine(`Vous avez rejoint le chat: ${chatId}`,{sender:'SYSTEM'})
-        setStatus('Connecté'); ChatUI.style.display='grid'; lastIndex=0
-        StartPolling()
-      } else AppendLine('Impossible de rejoindre après création: '+(resp.error||JSON.stringify(resp)),{sender:'SYSTEM',isError:true})
-    }
-
-    async function LeaveChat(){
-      if(!chatId||!nickname) return
-      await ApiPost('/leave',{chat_id:chatId,nickname})
-      AppendLine('Vous avez quitté le chat.',{sender:'SYSTEM'})
-      chatId=null; nickname=null
-      ChatIdDisplay.textContent='—'; NickDisplay.textContent='—'
-      setStatus('Pas connecté'); StopPolling(); ChatUI.style.display='none'
-    }
-
-    function setStatus(s){ Status.textContent=s }
-
-    document.getElementById('createEphemeral').addEventListener('click', ()=> CreateChatFlow('ephemeral'))
-    document.getElementById('createPersistent').addEventListener('click', ()=> CreateChatFlow('persistent'))
-    document.getElementById('createLocked').addEventListener('click', ()=> CreateChatFlow('locked'))
-
-    document.getElementById('joinEphemeral').addEventListener('click', ()=> JoinChatFlow('ephemeral'))
-    document.getElementById('joinPersistent').addEventListener('click', ()=> JoinChatFlow('persistent'))
-    document.getElementById('joinLocked').addEventListener('click', ()=> JoinChatFlow('locked'))
-
-    document.getElementById('leaveBtn').addEventListener('click', LeaveChat)
-    document.getElementById('sendBtn').addEventListener('click', async ()=>{
-      const v = document.getElementById('messageInput').value.trim()
-      if(!v) return; await SendMessage(v)
-      document.getElementById('messageInput').value=''
-    })
-    document.getElementById('messageInput').addEventListener('keydown', async (e)=>{
-      if(e.key==='Enter') document.getElementById('sendBtn').click()
-      if(e.ctrlKey&&e.key.toLowerCase()==='u') document.getElementById('selectImageBtn').click()
-      if(e.ctrlKey&&e.key.toLowerCase()==='r') GetMessages()
-    })
-    document.getElementById('selectImageBtn').addEventListener('click', ()=> FilePicker.click())
-    FilePicker.addEventListener('change', async (ev)=>{
-      const f=ev.target.files[0]; if(!f) return
-      await UploadImage(f); FilePicker.value=''
-    })
-    document.getElementById('refreshBtn').addEventListener('click', GetMessages)
-    document.getElementById('clearLocalBtn').addEventListener('click', ()=> { Output.innerHTML='' })
-
-    Log("pantheon init\n> awaiting input")
-  </script>
+appendLine("Pantheon Terminal initialisé. Tapez /help pour commencer.",{sender:'SYSTEM'});
+</script>
 </body>
 </html>
