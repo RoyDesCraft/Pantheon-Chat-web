@@ -82,10 +82,8 @@
       const url = match[0];
       let embedEl;
 
-      // Détection image
       if (/\.(jpeg|jpg|gif|png|webp|svg)$/i.test(url)) {
-        embedEl = document.createElement("div");
-        embedEl.style.marginTop = "6px";
+        // Image
         const a = document.createElement("a");
         a.href = url;
         a.target = "_blank";
@@ -96,11 +94,9 @@
         img.style.display = "block";
         img.style.marginTop = "4px";
         a.appendChild(img);
-        embedEl.appendChild(a);
-        frag.appendChild(embedEl);
-      }
-      // Détection vidéo YouTube
-      else if (/^https?:\/\/(www\.)?youtube\.com\/watch\?v=/.test(url) || /^https?:\/\/youtu\.be\//.test(url)) {
+        frag.appendChild(a);
+      } else if (/^https?:\/\/(www\.)?youtube\.com\/watch\?v=/.test(url) || /^https?:\/\/youtu\.be\//.test(url)) {
+        // YouTube
         embedEl = document.createElement("iframe");
         embedEl.width = "300";
         embedEl.height = "180";
@@ -111,9 +107,8 @@
         embedEl.allowFullscreen = true;
         embedEl.style.marginTop = "6px";
         frag.appendChild(embedEl);
-      }
-      // Sinon : hyperlien simple
-      else {
+      } else {
+        // Hyperlien simple
         const a = document.createElement("a");
         a.href = url;
         a.textContent = url;
@@ -130,7 +125,6 @@
     return frag;
   }
 
-  // On modifie appendLine pour inclure la détection
   function appendLine(text, options = {}) {
     const el = document.createElement("div");
     el.className = "line";
@@ -143,13 +137,10 @@
       el.appendChild(sender);
     }
 
-    const parsed = detectAndEmbed(text);
-    el.appendChild(parsed);
-
+    el.appendChild(detectAndEmbed(text));
     output.appendChild(el);
     output.scrollTop = output.scrollHeight;
   }
 </script>
-
 </body>
 </html>
