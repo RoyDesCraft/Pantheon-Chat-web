@@ -70,97 +70,85 @@
   <input id="filePicker" type="file" accept="image/*" style="display:none" />
 
 <script>
-  const output = document.getElementById("output");
-  const statusEl = document.getElementById("status");
-  const chatUI = document.getElementById("chatUI");
+  function appendLine(text, options = {}) {
+    const ansiRegex = /\x1b\[48;2;(\d+);(\d+);(\d+)m(.*?)\x1b\[0m/g;
+    let match, lastIndex = 0;
+    const el = document.createElement('div');
+    el.className = 'line';
 
-  let currentNick = "";
-  let currentChatId = "";
-  let connected = false;
-
-  function detectAndEmbed(text) {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const frag = document.createDocumentFragment();
-    let lastIndex = 0, match;
-
-    while ((match = urlRegex.exec(text)) !== null) {
+    while ((match = ansiRegex.exec(text)) !== null) {
       if (match.index > lastIndex) {
-        frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+        const t = text.slice(lastIndex, match.index);
+        const span = document.createElement('span');
+        span.textContent = t;
+        el.appendChild(span);
       }
-      const url = match[0];
-      if (/\.(jpeg|jpg|gif|png|webp|svg)$/i.test(url)) {
-        const a = document.createElement("a");
-        a.href = url; a.target = "_blank";
-        const img = document.createElement("img");
-        img.src = url; img.style.maxWidth = "240px"; img.style.borderRadius = "6px"; img.style.display="block"; img.style.marginTop="4px";
-        a.appendChild(img); frag.appendChild(a);
-      } else if (/^https?:\/\/(www\.)?youtube\.com\/watch\?v=/.test(url) || /^https?:\/\/youtu\.be\//.test(url)) {
-        const iframe = document.createElement("iframe");
-        iframe.width="300"; iframe.height="180";
-        iframe.src = url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
-        iframe.frameBorder="0"; iframe.allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"; iframe.allowFullscreen=true;
-        iframe.style.marginTop="6px"; frag.appendChild(iframe);
-      } else {
-        const a = document.createElement("a");
-        a.href = url; a.textContent = url; a.target = "_blank"; a.style.color="var(--accent)";
-        frag.appendChild(a);
-      }
-      lastIndex = match.index + url.length;
+      const block = document.createElement('span');
+      block.className = 'color-block';
+      block.style.backgroundColor = `rgb(${match[1]},${match[2]},${match[3]})`;
+      block.textContent = match[2] == match[1] ? "  " : match[4] || "  ";
+      el.appendChild(block);
+      lastIndex = match.index + match[0].length;
     }
-    if (lastIndex < text.length) frag.appendChild(document.createTextNode(text.slice(lastIndex)));
-    return frag;
-  }
 
-  function appendLine(text, options={}) {
-    const el = document.createElement("div");
-    el.className = "line";
-    if (options.sender) {
-      const sender = document.createElement("span");
-      sender.className = "sender";
-      sender.textContent = `<${options.sender}> `;
-      sender.style.color = options.color || "#7ee0ff";
-      el.appendChild(sender);
+    if (lastIndex < text.length) {
+      const rawText = text.slice(lastIndex);
+
+      // Regex pour détecter les liens
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      let urlMatch, cursor = 0;
+
+      while ((urlMatch = urlRegex.exec(rawText)) !== null) {
+        if (urlMatch.index > cursor) {
+          const normalText = rawText.slice(cursor, urlMatch.index);
+          const span = document.createElement('span');
+          span.textContent = normalText;
+          el.appendChild(span);
+        }
+
+        const url = urlMatch[0];
+        if (url.match(/\.(png|jpg|jpeg|gif|webp)$/i)) {
+          // Embed image
+          const img = document.createElement('img');
+          img.src = url;
+          img.style.maxWidth = "300px";
+          img.style.maxHeight = "200px";
+          img.style.display = "block";
+          img.style.marginTop = "4px";
+          el.appendChild(img);
+        } else {
+          // Lien hypertexte
+          const a = document.createElement('a');
+          a.href = url;
+          a.textContent = url;
+          a.target = "_blank";
+          a.style.color = "var(--accent)";
+          a.style.textDecoration = "underline";
+          el.appendChild(a);
+        }
+
+        cursor = urlMatch.index + url.length;
+      }
+
+      if (cursor < rawText.length) {
+        const span = document.createElement('span');
+        span.textContent = rawText.slice(cursor);
+        el.appendChild(span);
+      }
     }
-    el.appendChild(detectAndEmbed(text));
+
+    if (options.sender) {
+      const sender = document.createElement('span');
+      sender.className = 'sender';
+      sender.textContent = `<${options.sender}> `;
+      sender.style.color = options.color || '#fff';
+      el.insertBefore(sender, el.firstChild);
+    }
+
     output.appendChild(el);
     output.scrollTop = output.scrollHeight;
   }
-
-  // Boutons
-  document.getElementById("createBtn").onclick = () => {
-    currentNick = document.getElementById("nickInput").value.trim();
-    if (!currentNick) return alert("Entrez un pseudo !");
-    currentChatId = "chat-" + Math.floor(Math.random()*10000);
-    chatUI.style.display="grid";
-    statusEl.textContent = "Connecté au chat " + currentChatId;
-    connected = true;
-    appendLine("Chat créé avec ID " + currentChatId, {sender:"Système"});
-  };
-
-  document.getElementById("joinBtn").onclick = () => {
-    currentNick = document.getElementById("nickInput").value.trim();
-    currentChatId = document.getElementById("chatIdInput").value.trim();
-    if (!currentNick || !currentChatId) return alert("Pseudo et ID requis !");
-    chatUI.style.display="grid";
-    statusEl.textContent = "Connecté au chat " + currentChatId;
-    connected = true;
-    appendLine(currentNick + " a rejoint le chat " + currentChatId, {sender:"Système"});
-  };
-
-  document.getElementById("leaveBtn").onclick = () => {
-    connected = false;
-    statusEl.textContent = "Pas connecté";
-    appendLine(currentNick + " a quitté le chat", {sender:"Système"});
-  };
-
-  // Envoi message
-  document.getElementById("sendBtn").onclick = () => {
-    if (!connected) return alert("Pas connecté !");
-    const msg = document.getElementById("messageInput").value.trim();
-    if (!msg) return;
-    appendLine(msg, {sender: currentNick});
-    document.getElementById("messageInput").value = "";
-  };
 </script>
+
 </body>
 </html>
