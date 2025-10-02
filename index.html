@@ -5,274 +5,95 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pantheon Chat - Terminal Web</title>
   <style>
-    :root{--bg:#0b0f14;--panel:#0f1720;--text:#d6e1e8;--muted:#9aa7b3;--accent:#7ee0ff}
-    html,body{height:100%;margin:0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;background:linear-gradient(180deg,#00101a 0%,#021827 100%);color:var(--text)}
-    .wrap{max-width:1100px;margin:28px auto;padding:18px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));box-shadow:0 8px 30px rgba(2,6,23,0.7)}
-    header{display:flex;align-items:center;gap:12px}
-    .title{font-size:18px;font-weight:700}
-    .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
-    button{background:#162029;border:1px solid rgba(255,255,255,0.03);color:var(--text);padding:8px 10px;border-radius:8px;cursor:pointer}
-    button:active{transform:translateY(1px)}
-    main{margin-top:14px;display:none;grid-template-columns:1fr 320px;gap:14px}
-    .terminal{background:var(--panel);border-radius:8px;padding:12px;min-height:480px;display:flex;flex-direction:column}
-    .output{flex:1;overflow:auto;padding:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);border-radius:6px;font-size:13px}
-    .prompt{display:flex;gap:8px;align-items:center;margin-top:10px}
-    .input{flex:1}
-    input[type="text"], textarea{width:100%;padding:10px;border-radius:6px;background:#061116;border:1px solid rgba(255,255,255,0.03);color:var(--text);outline:none}
-    .sidebar{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px}
-    .meta{font-size:13px;color:var(--muted);margin-bottom:8px}
-    .line{white-space:pre-wrap;font-family:inherit;font-size:13px;margin:4px 0}
-    .sender{font-weight:700;margin-right:6px}
-    .small{font-size:12px;color:var(--muted)}
-    .color-block{display:inline-block;width:10px;height:10px;margin:0 1px;}
-    .embed{border-left:3px solid var(--accent);background:rgba(255,255,255,0.03);padding:6px 10px;margin-top:6px;border-radius:6px;font-size:12px}
-    .embed-title{font-weight:700;color:var(--accent);margin-bottom:3px}
-    .embed-desc{color:var(--muted);margin-bottom:4px}
-    .embed-img{max-width:260px;max-height:200px;border-radius:6px;display:block;margin-top:6px}
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+    :root{
+      --bg:#05070a;
+      --accent:#33ffcc;
+      --warn:#ffeb3b;
+      --text:#e0e0e0;
+    }
+    html,body{
+      height:100%;margin:0;
+      background:var(--bg);
+      font-family:'VT323', monospace;
+      color:var(--text);
+      font-size:22px;
+    }
+    .topbar{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:14px 20px;color:#fff;
+      font-size:24px;
+    }
+    .left{display:flex;align-items:center;gap:12px}
+    .btn{
+      border:2px solid var(--accent);
+      color:var(--accent);
+      background:transparent;
+      font-family:'VT323', monospace;
+      font-size:20px;
+      padding:4px 12px;
+      cursor:pointer;
+    }
+    .btn:active{transform:translateY(1px);}
+    .btn-warn{
+      border:2px solid var(--warn);
+      color:var(--warn);
+    }
+    .terminal{
+      border:3px solid #fff;
+      margin:12px auto;
+      width:95%;
+      height:80vh;
+      display:flex;
+      flex-direction:column;
+      background:radial-gradient(circle at center,#021d23 0%, #000 100%);
+    }
+    .output{
+      flex:1;
+      overflow:auto;
+      padding:12px;
+      font-size:22px;
+      white-space: pre-wrap;
+    }
+    .prompt{
+      display:flex;align-items:center;
+      border-top:1px solid #fff;
+      padding:10px;
+      gap:10px;
+    }
+    .textbox{
+      flex:1;
+      resize:none;
+      height:48px;
+      border:2px solid var(--accent);
+      outline:none;
+      background:#000;
+      color:var(--text);
+      font-family:'VT323', monospace;
+      font-size:22px;
+      padding:6px;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="title">Pantheon Chat — Terminal Web</div>
-      <div class="controls">
-        <button id="createBtn">Créer un chat</button>
-        <button id="joinBtn">Rejoindre</button>
-        <button id="leaveBtn">Quitter</button>
-      </div>
-    </header>
-
-    <main id="chatUI">
-      <section class="terminal">
-        <div class="output" id="output" aria-live="polite"></div>
-
-        <div class="prompt">
-          <div class="input"><input id="messageInput" type="text" placeholder="Tapez un message..." /></div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <button id="sendBtn">Envoyer</button>
-            <button id="selectImageBtn">Sélectionner image</button>
-          </div>
-        </div>
-      </section>
-
-      <aside class="sidebar">
-        <div class="meta">Etat</div>
-        <div id="status">Pas connecté</div>
-        <div style="height:12px"></div>
-        <div class="meta">Chat ID</div>
-        <div id="chatIdDisplay" class="small">—</div>
-        <div style="height:12px"></div>
-        <div class="meta">Pseudo</div>
-        <div id="nickDisplay" class="small">—</div>
-      </aside>
-    </main>
+  <div class="topbar">
+    <div class="left">
+      <button class="btn" id="newBtn">New</button>
+      <button class="btn" id="joinBtn">Join</button>
+      <button class="btn" id="leaveBtn">Leave</button>
+    </div>
+    <span id="accountStatus">No account.</span>
+    <button class="btn btn-warn" id="buyBtn">Buy me a Server</button>
   </div>
 
-  <input id="filePicker" type="file" accept="image/*" style="display:none" />
-
-  <script>
-    const output = document.getElementById('output');
-    const nickDisplay = document.getElementById('nickDisplay');
-    const chatIdDisplay = document.getElementById('chatIdDisplay');
-    const status = document.getElementById('status');
-    const chatUI = document.getElementById('chatUI');
-
-    const colors = ['Red','Green','Yellow','Blue','Magenta','Cyan'];
-    const colorsMap = {"SYSTEM":"White"};
-
-    let chatId = null;
-    let nickname = null;
-    let lastIndex = 0;
-    let poller = null;
-
-    function parseLinks(text){
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      let parts = text.split(urlRegex);
-      const frag = document.createDocumentFragment();
-
-      for(let part of parts){
-        if(urlRegex.test(part)){
-          const a = document.createElement('a');
-          a.href = part;
-          a.textContent = part;
-          a.target = "_blank";
-          a.style.color = "var(--accent)";
-          frag.appendChild(a);
-        } else {
-          frag.appendChild(document.createTextNode(part));
-        }
-      }
-      return frag;
-    }
-
-    function renderEmbed(embed){
-      if(!embed) return null;
-      const box = document.createElement('div');
-      box.className = "embed";
-
-      if(embed.title){
-        const t = document.createElement('div');
-        t.className = "embed-title";
-        const link = document.createElement('a');
-        link.href = embed.url || "#";
-        link.textContent = embed.title;
-        link.target = "_blank";
-        link.style.color = "var(--accent)";
-        t.appendChild(link);
-        box.appendChild(t);
-      }
-      if(embed.description){
-        const d = document.createElement('div');
-        d.className = "embed-desc";
-        d.textContent = embed.description;
-        box.appendChild(d);
-      }
-      if(embed.image){
-        const img = document.createElement('img');
-        img.src = embed.image;
-        img.className = "embed-img";
-        box.appendChild(img);
-      }
-      return box;
-    }
-
-    function appendLine(text, options = {}) {
-      const el = document.createElement('div');
-      el.className = 'line';
-
-      if(options.sender){
-        const sender = document.createElement('span');
-        sender.className = 'sender';
-        sender.textContent = `<${options.sender}> `;
-        sender.style.color = options.color || '#fff';
-        el.appendChild(sender);
-      }
-
-      el.appendChild(parseLinks(text));
-      output.appendChild(el);
-
-      // si embed présent
-      if(options.embed){
-        const embedBox = renderEmbed(options.embed);
-        if(embedBox) output.appendChild(embedBox);
-      }
-
-      output.scrollTop = output.scrollHeight;
-    }
-
-    function setStatus(s){ status.textContent = s; }
-
-    async function apiPost(path, body){
-      const res = await fetch('https://roydev.pythonanywhere.com' + path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(body)
-      });
-      return res.json();
-    }
-
-    async function apiGet(path){
-      const res = await fetch('https://roydev.pythonanywhere.com' + path);
-      return res.json();
-    }
-
-    async function sendMessage(text){
-      if(!chatId || !nickname) return;
-      try{
-        await apiPost('/send_message', { chat_id: chatId, nickname, text });
-      }catch(e){
-        appendLine('Erreur send_message: ' + e.message);
-      }
-    }
-
-    async function getMessages(){
-      if(!chatId) return;
-      try{
-        const resp = await apiGet(`/get_messages/${chatId}/${lastIndex}`);
-        if(resp && resp.messages){
-          for(const msg of resp.messages){
-            if(!colorsMap[msg.sender]){
-              colorsMap[msg.sender] = colors[Math.floor(Math.random()*colors.length)];
-            }
-            appendLine(msg.text, { 
-              sender: msg.sender, 
-              color: colorsMap[msg.sender],
-              embed: msg.embed || null
-            });
-          }
-          lastIndex = resp.new_index || lastIndex;
-        }
-      }catch(e){
-        appendLine('Erreur get_messages: '+e.message);
-      }
-    }
-
-    function startPolling(){ 
-      if(poller) return; 
-      poller = setInterval(getMessages, 1200); 
-    }
-    function stopPolling(){ if(!poller) return; clearInterval(poller); poller=null; }
-
-    async function joinChat(id, nick){
-      if(!nick){ alert('Un pseudo est obligatoire'); return; }
-      try{
-        setStatus('Tentative de rejoindre...');
-        const resp = await apiPost('/join', { chat_id: id, nickname: nick });
-        if(resp && !resp.error){
-          chatId = id;
-          nickname = nick;
-          chatIdDisplay.textContent = chatId;
-          nickDisplay.textContent = nickname;
-          appendLine(`Vous avez rejoint le chat: ${chatId}`);
-          setStatus('Connecté');
-          chatUI.style.display = 'grid';
-          startPolling();
-        } else {
-          appendLine('Impossible de rejoindre: ' + (resp.error || JSON.stringify(resp)));
-          setStatus('Erreur');
-        }
-      }catch(e){ appendLine('Erreur join: '+e.message); setStatus('Erreur'); }
-    }
-
-    async function createNewChat(){
-      const nick = prompt('Entrez votre pseudo');
-      if(!nick) return;
-      const resp = await apiPost('/new_chat', {});
-      const id = resp.chat_id || resp.id;
-      if(id){
-        appendLine('Chat créé et rejoint, ID: ' + id);
-        await joinChat(id, nick);
-      } else appendLine('Erreur création');
-    }
-
-    async function leaveChat(){
-      if(!chatId || !nickname) return;
-      try{
-        await apiPost('/leave', { chat_id: chatId, nickname });
-        appendLine('Vous avez quitté le chat.', {sender:"SYSTEM"});
-        chatId=null; nickname=null;
-        chatIdDisplay.textContent='—'; nickDisplay.textContent='—';
-        setStatus('Pas connecté'); stopPolling();
-        chatUI.style.display='none';
-      }catch(e){ appendLine('Erreur leave: '+e.message); }
-    }
-
-    document.getElementById('createBtn').addEventListener('click', createNewChat);
-    document.getElementById('joinBtn').addEventListener('click', async ()=>{
-      const id = prompt('Entrer ID du chat'); if(!id) return;
-      const nick = prompt('Entrer votre pseudo'); if(!nick) return;
-      await joinChat(id, nick);
-    });
-    document.getElementById('leaveBtn').addEventListener('click', leaveChat);
-
-    document.getElementById('sendBtn').addEventListener('click', async ()=>{
-      const v = document.getElementById('messageInput').value.trim();
-      if(v){ await sendMessage(v); }
-      document.getElementById('messageInput').value='';
-    });
-    document.getElementById('messageInput').addEventListener('keydown', async (e)=>{
-      if(e.key==='Enter'){ document.getElementById('sendBtn').click(); }
-    });
-  </script>
+  <div class="terminal">
+    <div class="output" id="output"></div>
+    <div class="prompt">
+      <textarea class="textbox" id="messageInput" placeholder="Type commands or messages..."></textarea>
+      <button class="btn" id="sendBtn">Send</button>
+    </div>
+  </div>
+  <script src="script.js"></script>
 </body>
 </html>
