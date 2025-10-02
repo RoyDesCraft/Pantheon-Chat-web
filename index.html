@@ -67,6 +67,8 @@
   <input id="filePicker" type="file" accept="image/*" style="display:none" />
 
 <script>
+  const output = document.getElementById("output");
+
   function detectAndEmbed(text) {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const frag = document.createDocumentFragment();
