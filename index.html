@@ -25,10 +25,10 @@
     .sender{font-weight:700;margin-right:6px}
     .small{font-size:12px;color:var(--muted)}
     .color-block{display:inline-block;width:10px;height:10px;margin:0 1px;}
-    .embed-card{border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);padding:8px;border-radius:6px;margin-top:4px;max-width:300px;font-size:12px}
-    .embed-card a{color:var(--accent);text-decoration:none;font-weight:bold;display:block;margin-bottom:4px}
-    .embed-card .desc{color:var(--muted);margin-bottom:4px}
-    .embed-card img{max-width:100%;border-radius:6px;margin-top:4px}
+    .embed{border-left:3px solid var(--accent);background:rgba(255,255,255,0.03);padding:6px 10px;margin-top:6px;border-radius:6px;font-size:12px}
+    .embed-title{font-weight:700;color:var(--accent);margin-bottom:3px}
+    .embed-desc{color:var(--muted);margin-bottom:4px}
+    .embed-img{max-width:260px;max-height:200px;border-radius:6px;display:block;margin-top:6px}
   </style>
 </head>
 <body>
@@ -50,6 +50,7 @@
           <div class="input"><input id="messageInput" type="text" placeholder="Tapez un message..." /></div>
           <div style="display:flex;gap:8px;align-items:center">
             <button id="sendBtn">Envoyer</button>
+            <button id="selectImageBtn">Sélectionner image</button>
           </div>
         </div>
       </section>
@@ -67,6 +68,8 @@
     </main>
   </div>
 
+  <input id="filePicker" type="file" accept="image/*" style="display:none" />
+
   <script>
     const output = document.getElementById('output');
     const nickDisplay = document.getElementById('nickDisplay');
@@ -79,47 +82,79 @@
 
     let chatId = null;
     let nickname = null;
+    let lastIndex = 0;
+    let poller = null;
 
-    function appendMessage(msg){
+    function parseLinks(text){
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      let parts = text.split(urlRegex);
+      const frag = document.createDocumentFragment();
+
+      for(let part of parts){
+        if(urlRegex.test(part)){
+          const a = document.createElement('a');
+          a.href = part;
+          a.textContent = part;
+          a.target = "_blank";
+          a.style.color = "var(--accent)";
+          frag.appendChild(a);
+        } else {
+          frag.appendChild(document.createTextNode(part));
+        }
+      }
+      return frag;
+    }
+
+    function renderEmbed(embed){
+      if(!embed) return null;
+      const box = document.createElement('div');
+      box.className = "embed";
+
+      if(embed.title){
+        const t = document.createElement('div');
+        t.className = "embed-title";
+        const link = document.createElement('a');
+        link.href = embed.url || "#";
+        link.textContent = embed.title;
+        link.target = "_blank";
+        link.style.color = "var(--accent)";
+        t.appendChild(link);
+        box.appendChild(t);
+      }
+      if(embed.description){
+        const d = document.createElement('div');
+        d.className = "embed-desc";
+        d.textContent = embed.description;
+        box.appendChild(d);
+      }
+      if(embed.image){
+        const img = document.createElement('img');
+        img.src = embed.image;
+        img.className = "embed-img";
+        box.appendChild(img);
+      }
+      return box;
+    }
+
+    function appendLine(text, options = {}) {
       const el = document.createElement('div');
       el.className = 'line';
 
-      if(msg.sender){
+      if(options.sender){
         const sender = document.createElement('span');
         sender.className = 'sender';
-        sender.textContent = `<${msg.sender}> `;
-        sender.style.color = colorsMap[msg.sender] || '#fff';
+        sender.textContent = `<${options.sender}> `;
+        sender.style.color = options.color || '#fff';
         el.appendChild(sender);
       }
 
-      el.appendChild(document.createTextNode(msg.text));
+      el.appendChild(parseLinks(text));
       output.appendChild(el);
 
-      // si embed existe
-      if(msg.embed){
-        const card = document.createElement('div');
-        card.className = 'embed-card';
-
-        const link = document.createElement('a');
-        link.href = msg.embed.url;
-        link.target = "_blank";
-        link.textContent = msg.embed.title || msg.embed.url;
-        card.appendChild(link);
-
-        if(msg.embed.description){
-          const desc = document.createElement('div');
-          desc.className = 'desc';
-          desc.textContent = msg.embed.description;
-          card.appendChild(desc);
-        }
-
-        if(msg.embed.image){
-          const img = document.createElement('img');
-          img.src = msg.embed.image;
-          card.appendChild(img);
-        }
-
-        output.appendChild(card);
+      // si embed présent
+      if(options.embed){
+        const embedBox = renderEmbed(options.embed);
+        if(embedBox) output.appendChild(embedBox);
       }
 
       output.scrollTop = output.scrollHeight;
@@ -127,65 +162,115 @@
 
     function setStatus(s){ status.textContent = s; }
 
-    // WebSocket connexion
-    let ws;
-    function connectWS(){
-      ws = new WebSocket("ws://localhost:5000/ws"); // adapter l’URL si hébergé
-      ws.onopen = ()=> setStatus("Connecté au serveur");
-      ws.onclose = ()=> setStatus("Déconnecté");
-      ws.onmessage = (event)=>{
-        const data = JSON.parse(event.data);
-        if(data.type === "msg"){
-          if(!colorsMap[data.sender]){
-            colorsMap[data.sender] = colors[Math.floor(Math.random()*colors.length)];
-          }
-          appendMessage(data);
-        }
-        if(data.type === "bulk"){
-          for(const m of data.messages){
-            appendMessage(m);
-          }
-        }
-        if(data.type === "joined"){
-          setStatus("Chat rejoint");
-        }
+    async function apiPost(path, body){
+      const res = await fetch('https://roydev.pythonanywhere.com' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+      return res.json();
+    }
+
+    async function apiGet(path){
+      const res = await fetch('https://roydev.pythonanywhere.com' + path);
+      return res.json();
+    }
+
+    async function sendMessage(text){
+      if(!chatId || !nickname) return;
+      try{
+        await apiPost('/send_message', { chat_id: chatId, nickname, text });
+      }catch(e){
+        appendLine('Erreur send_message: ' + e.message);
       }
     }
 
-    connectWS();
-
-    document.getElementById('createBtn').addEventListener('click', ()=>{
-      ws.send(JSON.stringify({action:"create_chat"}));
-    });
-
-    document.getElementById('joinBtn').addEventListener('click', ()=>{
-      const id = prompt("ID du chat ?");
-      const nick = prompt("Votre pseudo ?");
-      if(id && nick){
-        chatId=id; nickname=nick;
-        chatIdDisplay.textContent=id; nickDisplay.textContent=nick;
-        ws.send(JSON.stringify({action:"join", chat_id:id, nickname:nick}));
+    async function getMessages(){
+      if(!chatId) return;
+      try{
+        const resp = await apiGet(`/get_messages/${chatId}/${lastIndex}`);
+        if(resp && resp.messages){
+          for(const msg of resp.messages){
+            if(!colorsMap[msg.sender]){
+              colorsMap[msg.sender] = colors[Math.floor(Math.random()*colors.length)];
+            }
+            appendLine(msg.text, { 
+              sender: msg.sender, 
+              color: colorsMap[msg.sender],
+              embed: msg.embed || null
+            });
+          }
+          lastIndex = resp.new_index || lastIndex;
+        }
+      }catch(e){
+        appendLine('Erreur get_messages: '+e.message);
       }
-    });
+    }
 
-    document.getElementById('leaveBtn').addEventListener('click', ()=>{
-      if(chatId){
-        ws.send(JSON.stringify({action:"leave", chat_id:chatId}));
+    function startPolling(){ 
+      if(poller) return; 
+      poller = setInterval(getMessages, 1200); 
+    }
+    function stopPolling(){ if(!poller) return; clearInterval(poller); poller=null; }
+
+    async function joinChat(id, nick){
+      if(!nick){ alert('Un pseudo est obligatoire'); return; }
+      try{
+        setStatus('Tentative de rejoindre...');
+        const resp = await apiPost('/join', { chat_id: id, nickname: nick });
+        if(resp && !resp.error){
+          chatId = id;
+          nickname = nick;
+          chatIdDisplay.textContent = chatId;
+          nickDisplay.textContent = nickname;
+          appendLine(`Vous avez rejoint le chat: ${chatId}`);
+          setStatus('Connecté');
+          chatUI.style.display = 'grid';
+          startPolling();
+        } else {
+          appendLine('Impossible de rejoindre: ' + (resp.error || JSON.stringify(resp)));
+          setStatus('Erreur');
+        }
+      }catch(e){ appendLine('Erreur join: '+e.message); setStatus('Erreur'); }
+    }
+
+    async function createNewChat(){
+      const nick = prompt('Entrez votre pseudo');
+      if(!nick) return;
+      const resp = await apiPost('/new_chat', {});
+      const id = resp.chat_id || resp.id;
+      if(id){
+        appendLine('Chat créé et rejoint, ID: ' + id);
+        await joinChat(id, nick);
+      } else appendLine('Erreur création');
+    }
+
+    async function leaveChat(){
+      if(!chatId || !nickname) return;
+      try{
+        await apiPost('/leave', { chat_id: chatId, nickname });
+        appendLine('Vous avez quitté le chat.', {sender:"SYSTEM"});
         chatId=null; nickname=null;
         chatIdDisplay.textContent='—'; nickDisplay.textContent='—';
-        setStatus("Pas connecté");
-      }
-    });
+        setStatus('Pas connecté'); stopPolling();
+        chatUI.style.display='none';
+      }catch(e){ appendLine('Erreur leave: '+e.message); }
+    }
 
-    document.getElementById('sendBtn').addEventListener('click', ()=>{
-      const v=document.getElementById('messageInput').value.trim();
-      if(v && chatId && nickname){
-        ws.send(JSON.stringify({action:"send", chat_id:chatId, nickname:nickname, text:v}));
-        document.getElementById('messageInput').value='';
-      }
+    document.getElementById('createBtn').addEventListener('click', createNewChat);
+    document.getElementById('joinBtn').addEventListener('click', async ()=>{
+      const id = prompt('Entrer ID du chat'); if(!id) return;
+      const nick = prompt('Entrer votre pseudo'); if(!nick) return;
+      await joinChat(id, nick);
     });
+    document.getElementById('leaveBtn').addEventListener('click', leaveChat);
 
-    document.getElementById('messageInput').addEventListener('keydown',(e)=>{
+    document.getElementById('sendBtn').addEventListener('click', async ()=>{
+      const v = document.getElementById('messageInput').value.trim();
+      if(v){ await sendMessage(v); }
+      document.getElementById('messageInput').value='';
+    });
+    document.getElementById('messageInput').addEventListener('keydown', async (e)=>{
       if(e.key==='Enter'){ document.getElementById('sendBtn').click(); }
     });
   </script>
