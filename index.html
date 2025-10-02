@@ -25,6 +25,8 @@
     .sender{font-weight:700;margin-right:6px}
     .small{font-size:12px;color:var(--muted)}
     .color-block{display:inline-block;width:10px;height:10px;margin:0 1px;}
+    .output img{border:1px solid rgba(255,255,255,0.1);box-shadow:0 2px 8px rgba(0,0,0,0.5)}
+    .output iframe{border-radius:6px;border:none}
   </style>
 </head>
 <body>
@@ -52,7 +54,7 @@
       </section>
 
       <aside class="sidebar">
-        <div class="meta">Etat</div>
+        <div class="meta">État</div>
         <div id="status">Pas connecté</div>
         <div style="height:12px"></div>
         <div class="meta">Chat ID</div>
@@ -80,10 +82,8 @@
         frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
       }
       const url = match[0];
-      let embedEl;
 
       if (/\.(jpeg|jpg|gif|png|webp|svg)$/i.test(url)) {
-        // Image
         const a = document.createElement("a");
         a.href = url;
         a.target = "_blank";
@@ -96,19 +96,15 @@
         a.appendChild(img);
         frag.appendChild(a);
       } else if (/^https?:\/\/(www\.)?youtube\.com\/watch\?v=/.test(url) || /^https?:\/\/youtu\.be\//.test(url)) {
-        // YouTube
-        embedEl = document.createElement("iframe");
-        embedEl.width = "300";
-        embedEl.height = "180";
-        embedEl.src = url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
-        embedEl.frameBorder = "0";
-        embedEl.allow =
-          "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-        embedEl.allowFullscreen = true;
-        embedEl.style.marginTop = "6px";
-        frag.appendChild(embedEl);
+        const iframe = document.createElement("iframe");
+        iframe.width = "300";
+        iframe.height = "180";
+        iframe.src = url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
+        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+        iframe.allowFullscreen = true;
+        iframe.style.marginTop = "6px";
+        frag.appendChild(iframe);
       } else {
-        // Hyperlien simple
         const a = document.createElement("a");
         a.href = url;
         a.textContent = url;
@@ -141,6 +137,9 @@
     output.appendChild(el);
     output.scrollTop = output.scrollHeight;
   }
+
+  // Exemple de test auto
+  appendLine("Bienvenue ! Envoyez un lien image https://example.com/image.png ou YouTube https://youtu.be/dQw4w9WgXcQ", {sender: "System", color: "#7ee0ff"});
 </script>
 </body>
 </html>
