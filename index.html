@@ -1,4 +1,4 @@
-<!doctype html>
+Modifie ce script client pour que les liens soient detectes et embed ainsi que transformé en hypertext (donc par exemple si c’est une image bah lembed montre l image): <!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
@@ -20,16 +20,22 @@
     .input{flex:1}
     input[type="text"], textarea{width:100%;padding:10px;border-radius:6px;background:#061116;border:1px solid rgba(255,255,255,0.03);color:var(--text);outline:none}
     .sidebar{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px}
-    .meta{font-size:13px;color:var(--muted);margin-bottom:6px}
+    .meta{font-size:13px;color:var(--muted);margin-bottom:8px}
     .line{white-space:pre-wrap;font-family:inherit;font-size:13px;margin:4px 0}
     .sender{font-weight:700;margin-right:6px}
     .small{font-size:12px;color:var(--muted)}
+    .color-block{display:inline-block;width:10px;height:10px;margin:0 1px;}
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <div class="title">Pantheon Chat — Terminal Web</div>
+      <div class="controls">
+        <button id="createBtn">Créer un chat</button>
+        <button id="joinBtn">Rejoindre</button>
+        <button id="leaveBtn">Quitter</button>
+      </div>
     </header>
 
     <main id="chatUI">
@@ -37,32 +43,23 @@
         <div class="output" id="output" aria-live="polite"></div>
 
         <div class="prompt">
-          <div class="input"><input id="messageInput" type="text" placeholder="Tapez un message..." /></div>
+          <div class="input"><input id="messageInput" type="text" placeholder="Tapez un message ou 'select image' / 'return' / 'exit'" /></div>
           <div style="display:flex;gap:8px;align-items:center">
             <button id="sendBtn">Envoyer</button>
-            <button id="selectImageBtn">📷</button>
+            <button id="selectImageBtn">Sélectionner image</button>
           </div>
         </div>
       </section>
 
       <aside class="sidebar">
-        <div class="meta">Pseudo</div>
-        <input id="nickInput" type="text" placeholder="Entrez votre pseudo" />
-
+        <div class="meta">Etat</div>
+        <div id="status">Pas connecté</div>
         <div style="height:12px"></div>
         <div class="meta">Chat ID</div>
-        <input id="chatIdInput" type="text" placeholder="ID du chat" />
-
+        <div id="chatIdDisplay" class="small">—</div>
         <div style="height:12px"></div>
-        <div class="controls">
-          <button id="createBtn">Créer</button>
-          <button id="joinBtn">Rejoindre</button>
-          <button id="leaveBtn">Quitter</button>
-        </div>
-
-        <div style="height:12px"></div>
-        <div class="meta">Etat</div>
-        <div id="status" class="small">Pas connecté</div>
+        <div class="meta">Pseudo</div>
+        <div id="nickDisplay" class="small">—</div>
       </aside>
     </main>
   </div>
