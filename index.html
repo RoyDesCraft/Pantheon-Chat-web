@@ -1,4 +1,4 @@
-Modifie ce script client pour que les liens soient detectes et embed ainsi que transformé en hypertext (donc par exemple si c’est une image bah lembed montre l image): <!doctype html>
+<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
@@ -25,6 +25,7 @@ Modifie ce script client pour que les liens soient detectes et embed ainsi que t
     .sender{font-weight:700;margin-right:6px}
     .small{font-size:12px;color:var(--muted)}
     .color-block{display:inline-block;width:10px;height:10px;margin:0 1px;}
+    .embed-img{max-width:260px;max-height:200px;border-radius:6px;display:block;margin-top:6px}
   </style>
 </head>
 <body>
@@ -66,86 +67,238 @@ Modifie ce script client pour que les liens soient detectes et embed ainsi que t
 
   <input id="filePicker" type="file" accept="image/*" style="display:none" />
 
-<script>
-  function appendLine(text, options = {}) {
-    const ansiRegex = /\x1b\[48;2;(\d+);(\d+);(\d+)m(.*?)\x1b\[0m/g;
-    let match, lastIndex = 0;
-    const el = document.createElement('div');
-    el.className = 'line';
+  <script>
+    const output = document.getElementById('output');
+    const nickDisplay = document.getElementById('nickDisplay');
+    const chatIdDisplay = document.getElementById('chatIdDisplay');
+    const status = document.getElementById('status');
+    const chatUI = document.getElementById('chatUI');
 
-    while ((match = ansiRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        const t = text.slice(lastIndex, match.index);
-        const span = document.createElement('span');
-        span.textContent = t;
-        el.appendChild(span);
-      }
-      const block = document.createElement('span');
-      block.className = 'color-block';
-      block.style.backgroundColor = `rgb(${match[1]},${match[2]},${match[3]})`;
-      block.textContent = match[2] == match[1] ? "  " : match[4] || "  ";
-      el.appendChild(block);
-      lastIndex = match.index + match[0].length;
-    }
+    const colors = ['Red','Green','Yellow','Blue','Magenta','Cyan'];
+    const colorsMap = {"SYSTEM":"White"};
 
-    if (lastIndex < text.length) {
-      const rawText = text.slice(lastIndex);
+    let chatId = null;
+    let nickname = null;
+    let lastIndex = 0;
+    let poller = null;
 
-      // Regex pour détecter les liens
+    function parseLinks(text){
       const urlRegex = /(https?:\/\/[^\s]+)/g;
-      let urlMatch, cursor = 0;
+      let parts = text.split(urlRegex);
+      const frag = document.createDocumentFragment();
 
-      while ((urlMatch = urlRegex.exec(rawText)) !== null) {
-        if (urlMatch.index > cursor) {
-          const normalText = rawText.slice(cursor, urlMatch.index);
-          const span = document.createElement('span');
-          span.textContent = normalText;
-          el.appendChild(span);
-        }
-
-        const url = urlMatch[0];
-        if (url.match(/\.(png|jpg|jpeg|gif|webp)$/i)) {
-          // Embed image
-          const img = document.createElement('img');
-          img.src = url;
-          img.style.maxWidth = "300px";
-          img.style.maxHeight = "200px";
-          img.style.display = "block";
-          img.style.marginTop = "4px";
-          el.appendChild(img);
+      for(let part of parts){
+        if(urlRegex.test(part)){
+          if(/\.(png|jpe?g|gif|webp)$/i.test(part)){
+            const img = document.createElement('img');
+            img.src = part;
+            img.className = "embed-img";
+            frag.appendChild(img);
+          } else {
+            const a = document.createElement('a');
+            a.href = part;
+            a.textContent = part;
+            a.target = "_blank";
+            a.style.color = "var(--accent)";
+            frag.appendChild(a);
+          }
         } else {
-          // Lien hypertexte
-          const a = document.createElement('a');
-          a.href = url;
-          a.textContent = url;
-          a.target = "_blank";
-          a.style.color = "var(--accent)";
-          a.style.textDecoration = "underline";
-          el.appendChild(a);
+          frag.appendChild(document.createTextNode(part));
         }
+      }
+      return frag;
+    }
 
-        cursor = urlMatch.index + url.length;
+    function appendLine(text, options = {}) {
+      const ansiRegex = /\x1b\[48;2;(\d+);(\d+);(\d+)m(.*?)\x1b\[0m/g;
+      let match, lastIndex = 0;
+      const el = document.createElement('div');
+      el.className = 'line';
+
+      while((match = ansiRegex.exec(text)) !== null){
+        if(match.index > lastIndex){
+          const t = text.slice(lastIndex, match.index);
+          el.appendChild(parseLinks(t));
+        }
+        const block = document.createElement('span');
+        block.className = 'color-block';
+        block.style.backgroundColor = `rgb(${match[1]},${match[2]},${match[3]})`;
+        block.textContent = match[2]==match[1]? "  " : match[4] || "  ";
+        el.appendChild(block);
+        lastIndex = match.index + match[0].length;
       }
 
-      if (cursor < rawText.length) {
-        const span = document.createElement('span');
-        span.textContent = rawText.slice(cursor);
-        el.appendChild(span);
+      if(lastIndex < text.length){
+        el.appendChild(parseLinks(text.slice(lastIndex)));
+      }
+
+      if(options.sender){
+        const sender = document.createElement('span');
+        sender.className = 'sender';
+        sender.textContent = `<${options.sender}> `;
+        sender.style.color = options.color || '#fff';
+        el.insertBefore(sender, el.firstChild);
+      }
+
+      output.appendChild(el);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function setStatus(s){ status.textContent = s; }
+
+    async function apiPost(path, body){
+      const res = await fetch('https://roydev.pythonanywhere.com' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+      return res.json();
+    }
+
+    async function apiGet(path){
+      const res = await fetch('https://roydev.pythonanywhere.com' + path);
+      return res.json();
+    }
+
+    async function sendMessage(text){
+      if(!chatId || !nickname) return;
+      try{
+        await apiPost('/send_message', { chat_id: chatId, nickname, text });
+      }catch(e){
+        appendLine('Erreur send_message: ' + e.message);
       }
     }
 
-    if (options.sender) {
-      const sender = document.createElement('span');
-      sender.className = 'sender';
-      sender.textContent = `<${options.sender}> `;
-      sender.style.color = options.color || '#fff';
-      el.insertBefore(sender, el.firstChild);
+    function arrayBufferToBase64(buffer){
+      let binary='';
+      const bytes=new Uint8Array(buffer);
+      for(let i=0;i<bytes.byteLength;i++){ binary+=String.fromCharCode(bytes[i]); }
+      return btoa(binary);
     }
 
-    output.appendChild(el);
-    output.scrollTop = output.scrollHeight;
-  }
-</script>
+    async function sendImportMessage(file){
+      if(!chatId || !nickname) return;
+      const buf = await file.arrayBuffer();
+      const b64 = arrayBufferToBase64(buf);
+      const obj = {
+        path: b64,
+        type: "color",
+        resolution: 0.3
+      };
+      const text = "import " + JSON.stringify(obj);
+      await sendMessage(text);
+      appendLine("Image importée !", {sender:"SYSTEM", color:"green"});
+    }
 
+    async function getMessages(){
+      if(!chatId) return;
+      try{
+        const resp = await apiGet(`/get_messages/${chatId}/${lastIndex}`);
+        if(resp && resp.messages){
+          for(const msg of resp.messages){
+            if(!colorsMap[msg.sender]){
+              colorsMap[msg.sender] = colors[Math.floor(Math.random()*colors.length)];
+            }
+            appendLine(msg.text, { sender: msg.sender, color: colorsMap[msg.sender] });
+          }
+          lastIndex = resp.new_index || lastIndex;
+        }
+      }catch(e){
+        appendLine('Erreur get_messages: '+e.message);
+      }
+    }
+
+    function startPolling(){ 
+      if(poller) return; 
+      poller = setInterval(getMessages, 1200); 
+    }
+    function stopPolling(){ if(!poller) return; clearInterval(poller); poller=null; }
+
+    async function joinChat(id, nick){
+      if(!nick){ alert('Un pseudo est obligatoire'); return; }
+      try{
+        setStatus('Tentative de rejoindre...');
+        const resp = await apiPost('/join', { chat_id: id, nickname: nick });
+        if(resp && !resp.error){
+          chatId = id;
+          nickname = nick;
+          chatIdDisplay.textContent = chatId;
+          nickDisplay.textContent = nickname;
+          appendLine(`Vous avez rejoint le chat: ${chatId}`);
+          setStatus('Connecté');
+          chatUI.style.display = 'grid';
+          startPolling();
+        } else {
+          appendLine('Impossible de rejoindre: ' + (resp.error || JSON.stringify(resp)));
+          setStatus('Erreur');
+        }
+      }catch(e){ appendLine('Erreur join: '+e.message); setStatus('Erreur'); }
+    }
+
+    async function createNewChat(){
+      const nick = prompt('Entrez votre pseudo');
+      if(!nick) return;
+      const resp = await apiPost('/new_chat', {});
+      const id = resp.chat_id || resp.id;
+      if(id){
+        appendLine('Chat créé et rejoint, ID: ' + id);
+        await joinChat(id, nick);
+      } else appendLine('Erreur création');
+    }
+
+    async function leaveChat(){
+      if(!chatId || !nickname) return;
+      try{
+        await apiPost('/leave', { chat_id: chatId, nickname });
+        appendLine('Vous avez quitté le chat.', {sender:"SYSTEM"});
+        chatId=null; nickname=null;
+        chatIdDisplay.textContent='—'; nickDisplay.textContent='—';
+        setStatus('Pas connecté'); stopPolling();
+        chatUI.style.display='none';
+      }catch(e){ appendLine('Erreur leave: '+e.message); }
+    }
+
+    document.getElementById('createBtn').addEventListener('click', createNewChat);
+    document.getElementById('joinBtn').addEventListener('click', async ()=>{
+      const id = prompt('Entrer ID du chat'); if(!id) return;
+      const nick = prompt('Entrer votre pseudo'); if(!nick) return;
+      await joinChat(id, nick);
+    });
+    document.getElementById('leaveBtn').addEventListener('click', leaveChat);
+
+    document.getElementById('sendBtn').addEventListener('click', async ()=>{
+      const v = document.getElementById('messageInput').value.trim();
+      if(v){ await sendMessage(v); }
+      document.getElementById('messageInput').value='';
+    });
+    document.getElementById('messageInput').addEventListener('keydown', async (e)=>{
+      if(e.key==='Enter'){ document.getElementById('sendBtn').click(); }
+    });
+
+    document.getElementById('selectImageBtn').addEventListener('click', ()=>{ 
+      document.getElementById('filePicker').click(); 
+    });
+    document.getElementById('filePicker').addEventListener('change', async (ev)=>{
+      const f = ev.target.files[0]; 
+      if(!f) return;
+
+      const buf = await f.arrayBuffer();
+      const b64 = arrayBufferToBase64(buf);
+
+      document.getElementById('messageInput').value =
+        `import {"path":"data:image/${(f.type||'png').split('/').pop()};base64,${b64}","type":"color","resolution":0.3}`;
+    });
+
+    appendLine(`     _____                                                                   _____
+    ( ___ )                                                                 ( ___ )
+     |   |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|   |
+     |   |  ____       _      _   _   _____   _   _   _____    ___    _   _  |   |
+     |   | |  _ \\     / \\    | \\ | | |_   _| | | | | | ____|  / _ \\  | \\ | | |   |
+     |   | | |_) |   / _ \\   |  \\| |   | |   | |_| | |  _|   | | | | |  \\| | |   |
+     |   | |  __/   / ___ \\  | |\\  |   | |   |  _  | | |___  | |_| | | |\\  | |   |
+     |   | |_|     /_/   \\_\\ |_| \\_|   |_|   |_| |_| |_____|  \\___/  |_| \\_| |   |
+     |___|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|___|
+    (_____)                                                                 (_____)`);
+  </script>
 </body>
 </html>
