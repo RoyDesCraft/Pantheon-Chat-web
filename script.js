@@ -312,6 +312,8 @@ if (hashChat) {
     appendLine("Enter your nickname:", { sender: "SYSTEM" });
 }
 
-document.getElementById("buyBtn").addEventListener("click", function() {
-    window.open("https://buymeacoffee.com/roy_", "_blank");
+document.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("buyBtn").addEventListener("click", function() {
+        window.open("https://example.com", "_blank");
+    });
 });
