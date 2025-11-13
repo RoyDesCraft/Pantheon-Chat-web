@@ -314,6 +314,6 @@ if (hashChat) {
 
 document.addEventListener("DOMContentLoaded", function() {
     document.getElementById("buyBtn").addEventListener("click", function() {
-        window.open("https://example.com", "_blank");
+        window.open("https://buymeacoffee.com/roy_", "_blank");
     });
 });
