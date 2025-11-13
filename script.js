@@ -40,7 +40,6 @@ function linkifyAndEmbed(text) {
         a.style.color = "#33aaff";
         container.appendChild(a);
 
-        // YouTube embed
         let ytId = null;
         if (url.includes("youtube.com/watch") || url.includes("youtu.be/")) {
             if (url.includes("youtube.com/watch")) {
@@ -312,3 +311,7 @@ if (hashChat) {
     appendLine(`Chat ID detected in URL: ${hashChat}`, { sender: "SYSTEM" });
     appendLine("Enter your nickname:", { sender: "SYSTEM" });
 }
+
+document.getElementById("buyBtn").addEventListener("click", function() {
+    window.open("https://buymeacoffee.com/roy_", "_blank");
+});
